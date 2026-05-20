@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real Ticket Stubs</title>
+    <link href="https://fonts.cdnfonts.com/css/ocr-a-std" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="ticket.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">
+        <span class="brand-name">REAL TICKET STUBS</span>
+      </div>
+      <p class="tagline">Screenshot to print-ready Ticketmaster stub</p>
+    </header>
+
+    <main class="layout">
+      <section class="panel panel-upload" aria-labelledby="upload-heading">
+        <h2 id="upload-heading">1. Upload ticket screenshot</h2>
+        <p class="hint">Drop a mobile ticket or photo. We read the text and fill the Ticketmaster layout.</p>
+
+        <label class="dropzone" id="dropzone" for="file-input">
+          <input type="file" id="file-input" accept="image/*" hidden />
+          <span class="dropzone-icon" aria-hidden="true">TKT</span>
+          <span class="dropzone-text">Drag &amp; drop or click to choose image</span>
+          <span class="dropzone-sub">PNG, JPG, WEBP</span>
+        </label>
+
+        <div class="preview-wrap hidden" id="source-preview-wrap">
+          <p class="label">Source image</p>
+          <img id="source-preview" alt="Uploaded ticket screenshot" />
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="extract-btn" disabled>Extract details</button>
+        </div>
+
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel panel-edit hidden" id="edit-panel" aria-labelledby="edit-heading">
+        <h2 id="edit-heading">2. Review &amp; edit</h2>
+        <form id="ticket-form" class="ticket-form" autocomplete="off">
+          <div class="form-grid">
+            <label>Promo URL<input name="promo" type="text" placeholder="WWW.LIVENATION.COM" /></label>
+            <label>Artist<input name="eventLine2" type="text" placeholder="COLDPLAY" /></label>
+            <label>Tour<input name="tour" type="text" placeholder="VIVA LA VIDA TOUR" /></label>
+            <label>Venue<input name="venue" type="text" placeholder="HP PAVILION AT SAN JOSE" /></label>
+            <label class="span-2">Date &amp; time<input name="datetime" type="text" placeholder="FRI JUL 18 2008 7:30 PM" /></label>
+            <label>Disclaimer<input name="disclaimer" type="text" placeholder="NO CAMERAS OR RECORDERS" /></label>
+            <label>Event code<input name="ticketCode" type="text" placeholder="SJ0718" /></label>
+            <label>Event code (right)<input name="headerRight" type="text" placeholder="ESJ0718" /></label>
+            <label>Section / aisle<input name="section" type="text" placeholder="FLR 3" /></label>
+            <label>Aisle<input name="aisle" type="text" placeholder="AISLE 26" /></label>
+            <label>Row<input name="row" type="text" placeholder="14" /></label>
+            <label>Seat<input name="seat" type="text" placeholder="1" /></label>
+            <label>Price<input name="price" type="text" placeholder="180.00" /></label>
+            <label>Admission code<input name="admissionType" type="text" placeholder="VAUCTN" /></label>
+            <label>Event #<input name="eventNum" type="text" placeholder="1046555" /></label>
+            <label>CN<input name="cn" type="text" placeholder="CN 17258" /></label>
+            <label>Left aux<input name="auxLeft" type="text" placeholder="CA  6X" /></label>
+            <label>Right aux<input name="auxRight" type="text" placeholder="CA404SJA" /></label>
+            <label>Order code<input name="orderCode" type="text" placeholder="404VSJA" /></label>
+            <label>Short date<input name="dateShort" type="text" placeholder="18JUL08" /></label>
+            <label class="span-2">Barcode<input name="barcode" type="text" placeholder="6540422223612" /></label>
+          </div>
+        </form>
+        <button type="button" class="btn btn-primary" id="render-btn">Update preview</button>
+      </section>
+
+      <section class="panel panel-output" aria-labelledby="output-heading">
+        <h2 id="output-heading">3. Print-ready stub</h2>
+        <p class="hint">Vector Ticketmaster layout (1300x589). Print at 100% or save high-res PNG.</p>
+
+        <div class="stub-preview-wrap">
+          <div class="stub-stage" id="stub-stage"></div>
+        </div>
+
+        <div class="actions print-actions">
+          <button type="button" class="btn btn-primary" id="print-btn">Print stub</button>
+          <button type="button" class="btn btn-ghost" id="download-btn">Download PNG (3x)</button>
+          <button type="button" class="btn btn-ghost" id="download-svg-btn" title="Vector SVG, scales to any size">Download SVG</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>For personal memorabilia only. Not affiliated with Ticketmaster or Live Nation.</p>
+    </footer>
+
+    <!-- ─────────── Order modal: choose / address / pay / confirmation ─────────── -->
+    <div class="modal" id="order-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-card">
+        <button class="modal-close" type="button" data-close aria-label="Close">&times;</button>
+
+        <!-- Step 1: choose -->
+        <section class="modal-step" data-step="choose">
+          <h2 id="modal-title">Get your ticket stub</h2>
+          <p class="modal-sub">Print it yourself at home, or have a real printed stub mailed to your door on thermal-style card stock.</p>
+
+          <div class="choice-grid">
+            <button type="button" class="choice" data-action="print">
+              <div class="choice-title">Print at home</div>
+              <div class="choice-price">Free</div>
+              <div class="choice-meta">Send to your own printer. Best on white card stock.</div>
+            </button>
+            <button type="button" class="choice choice-primary" data-action="order">
+              <div class="choice-title">Mail me a printed stub</div>
+              <div class="choice-price">$2.99</div>
+              <div class="choice-meta">Thermal-style cardstock, perforated, shipped in 3–5 days.</div>
+            </button>
+          </div>
+        </section>
+
+        <!-- Step 2: shipping address -->
+        <section class="modal-step" data-step="address" hidden>
+          <h2>Shipping address</h2>
+          <p class="modal-sub">
+            We verify your email and mailing address before checkout (US &amp; Canada only).
+          </p>
+
+          <form id="address-form" class="modal-form" novalidate>
+            <p class="form-banner err hidden" id="address-form-banner" role="alert"></p>
+
+            <label class="full">Full name
+              <input name="name" type="text" autocomplete="name" required />
+              <span class="field-error" data-error-for="name"></span>
+            </label>
+            <label class="full">Email
+              <input name="email" type="email" autocomplete="email" required />
+              <span class="field-error" data-error-for="email"></span>
+            </label>
+            <label class="full">Confirm email
+              <input name="emailConfirm" type="email" autocomplete="email" required />
+              <span class="field-error" data-error-for="emailConfirm"></span>
+            </label>
+            <label class="full">Street address
+              <input name="street1" type="text" autocomplete="address-line1" required />
+              <span class="field-error" data-error-for="street1"></span>
+            </label>
+            <label class="full">Apt / Suite (optional)
+              <input name="street2" type="text" autocomplete="address-line2" />
+            </label>
+            <label>City
+              <input name="city" type="text" autocomplete="address-level2" required />
+              <span class="field-error" data-error-for="city"></span>
+            </label>
+            <label>State / Province
+              <input name="state" type="text" autocomplete="address-level1" placeholder="CA or California" required />
+              <span class="field-error" data-error-for="state"></span>
+            </label>
+            <label>ZIP / Postal
+              <input name="zip" type="text" autocomplete="postal-code" required />
+              <span class="field-error" data-error-for="zip"></span>
+            </label>
+            <label class="full">Country
+              <select name="country" autocomplete="country" required>
+                <option value="United States" selected>United States</option>
+                <option value="Canada">Canada</option>
+              </select>
+              <span class="field-error" data-error-for="country"></span>
+            </label>
+
+            <div class="modal-actions full">
+              <button type="button" class="btn btn-ghost" data-back>Back</button>
+              <button type="submit" class="btn btn-primary" id="address-continue-btn">Continue to payment</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Step 3: payment -->
+        <section class="modal-step" data-step="pay" hidden>
+          <h2>Payment</h2>
+          <p class="modal-sub">Secure checkout. Charges appear as "REAL TICKET STUBS".</p>
+
+          <div class="order-summary">
+            <div class="row"><span>Printed stub mailed (1x)</span><span>$2.99</span></div>
+            <div class="row total"><span>Total</span><span>$2.99</span></div>
+          </div>
+
+          <form id="payment-form" class="modal-form" novalidate>
+            <label class="full">Cardholder name<input name="cardName" type="text" autocomplete="cc-name" required /></label>
+            <label class="full">Card number<input name="cardNumber" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456" required /></label>
+            <label>Expiry<input name="cardExp" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" required /></label>
+            <label>CVC<input name="cardCvc" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" required /></label>
+
+            <div class="modal-actions full">
+              <button type="button" class="btn btn-ghost" data-back>Back</button>
+              <button type="submit" class="btn btn-primary" id="pay-btn">Pay $2.99 and place order</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Step 4: success -->
+        <section class="modal-step" data-step="success" hidden>
+          <h2>Order placed</h2>
+          <p class="modal-sub">Your printed stub is on the way. We sent a confirmation to <strong id="success-email">your email</strong>.</p>
+          <div class="order-summary">
+            <div class="row"><span>Confirmation #</span><span id="success-confirm">—</span></div>
+            <div class="row"><span>Shipping to</span><span id="success-address">—</span></div>
+            <div class="row total"><span>Charged</span><span>$2.99</span></div>
+          </div>
+          <div class="modal-actions full">
+            <button type="button" class="btn btn-primary" data-close>Done</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

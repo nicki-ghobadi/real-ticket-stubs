@@ -1,0 +1,696 @@
+/* Vector Ticketmaster stub — designed at 1300×589 (4.33in × 1.96in @ 300dpi).
+   Pure HTML/CSS/SVG, no raster image; safe for high-quality print. */
+
+/* Force any monospace value to render in bold-thermal weight; OCR-A Std only
+   provides regular, so fallback Courier is used at weight 700. */
+.tm,
+.tm .tm-mono-strong {
+  font-weight: 700;
+}
+
+.tm {
+  --tm-w: 1300px;
+  --tm-h: 589px;
+
+  --tm-blue: #2360a8;
+  --tm-blue-dark: #194279;
+  --tm-blue-hdr: #a8c4df;
+  --tm-blue-tint: #cfe1f1;
+  --tm-yellow: #f5c400;
+  --tm-ink: #060606;
+
+  --tm-mono: "OCR A Std", "OCR-A", "Courier New", "Courier", monospace;
+  --tm-label: Arial, Helvetica, sans-serif;
+  --tm-artist: "Arial Black", "Helvetica Black", Arial, sans-serif;
+  --tm-brand: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  position: relative;
+  width: var(--tm-w);
+  height: var(--tm-h);
+  background: #fff;
+  color: var(--tm-ink);
+  font-family: var(--tm-mono);
+  line-height: 1;
+  text-transform: uppercase;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tm *,
+.tm *::before,
+.tm *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── perforations ──
+   Two dashed cut-lines that match a real Ticketmaster thermal stub:
+     LEFT  → between the venue stub (0–208) and the center body (208–920)
+     RIGHT → between the center body (208–920) and the customer stub (920–1300)
+   Drawn with a dark dashed border so the printer always lays down ink. */
+.tm-perf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px dashed #2c2c2c;
+  z-index: 5;
+  pointer-events: none;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.tm-perf-left {
+  left: 208px;
+}
+
+.tm-perf-right {
+  left: 920px;
+}
+
+/* ───── LEFT STUB (0–208) ───── */
+.tm-left {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 208px;
+  height: 100%;
+  background: var(--tm-blue-tint);
+}
+
+.tm-left-top {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 48px;
+  padding: 10px 14px;
+  background: var(--tm-blue-hdr);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.tm-left-toplbl {
+  position: absolute;
+  left: 0;
+  top: 48px;
+  width: 100%;
+  height: 22px;
+  padding: 5px 14px;
+  background: var(--tm-blue);
+  color: #fff;
+  font-family: var(--tm-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-left-price {
+  position: absolute;
+  left: 14px;
+  top: 84px;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.tm-left-cc {
+  position: absolute;
+  left: 14px;
+  top: 130px;
+  font-family: var(--tm-label);
+  font-size: 9px;
+  font-weight: 700;
+  color: #444;
+  letter-spacing: 0.04em;
+}
+
+.tm-left-cc-sym {
+  position: absolute;
+  left: 14px;
+  top: 146px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.tm-left-seclbl {
+  position: absolute;
+  left: 0;
+  top: 180px;
+  width: 100%;
+  height: 20px;
+  padding: 4px 14px;
+  background: var(--tm-blue);
+  color: #fff;
+  font-family: var(--tm-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-left-sec {
+  position: absolute;
+  left: 14px;
+  top: 212px;
+  font-size: 42px;
+  font-weight: 700;
+}
+
+.tm-left-aux {
+  position: absolute;
+  left: 14px;
+  top: 268px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-left-rowlbl {
+  position: absolute;
+  left: 0;
+  top: 312px;
+  width: 60%;
+  height: 20px;
+  padding: 4px 14px;
+  background: var(--tm-blue);
+  color: #fff;
+  font-family: var(--tm-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-left-seatlbl {
+  position: absolute;
+  right: 0;
+  top: 312px;
+  width: 40%;
+  height: 20px;
+  padding: 4px 14px;
+  background: var(--tm-blue);
+  color: #fff;
+  font-family: var(--tm-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-left-row {
+  position: absolute;
+  left: 18px;
+  top: 344px;
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.tm-left-seat {
+  position: absolute;
+  right: 32px;
+  top: 344px;
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.tm-left-order {
+  position: absolute;
+  left: 14px;
+  bottom: 56px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tm-left-date {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  font-size: 32px;
+  font-weight: 700;
+}
+
+/* ───── CENTER (208–920) ───── */
+.tm-center {
+  position: absolute;
+  left: 208px;
+  top: 0;
+  width: 712px;
+  height: 100%;
+}
+
+.tm-head-vals {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 100%;
+  height: 36px;
+  padding: 0 22px;
+  display: grid;
+  grid-template-columns: 168px 110px 90px 168px 1fr;
+  align-items: center;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.tm-head-lbls {
+  position: absolute;
+  left: 0;
+  top: 52px;
+  width: 100%;
+  height: 26px;
+  padding: 6px 22px;
+  background: var(--tm-blue-hdr);
+  display: grid;
+  grid-template-columns: 168px 110px 90px 168px 1fr;
+  align-items: center;
+  font-family: var(--tm-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-sub {
+  position: absolute;
+  left: 0;
+  top: 88px;
+  width: 100%;
+  padding: 4px 22px;
+  height: 38px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.tm-sub-aisle {
+  position: absolute;
+  left: 22px;
+  top: 6px;
+}
+
+.tm-sub-price {
+  position: absolute;
+  left: 380px;
+  top: 6px;
+}
+
+.tm-sub-evnum {
+  position: absolute;
+  left: 548px;
+  top: 6px;
+}
+
+.tm-event {
+  position: absolute;
+  left: 0;
+  top: 130px;
+  width: 100%;
+  height: calc(var(--tm-h) - 130px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 8px 24px 16px;
+}
+
+.tm-wm {
+  position: absolute;
+  left: 50%;
+  top: 80px;
+  transform: translate(-50%, 0) rotate(-8deg);
+  font-family: var(--tm-brand);
+  font-size: 110px;
+  font-weight: 700;
+  font-style: italic;
+  color: rgba(120, 160, 200, 0.20);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  letter-spacing: -0.03em;
+  text-transform: lowercase;
+}
+
+.tm-promo,
+.tm-artist,
+.tm-tour,
+.tm-venue,
+.tm-disclaim,
+.tm-datetime {
+  position: relative;
+  z-index: 1;
+}
+
+.tm-promo {
+  margin-top: 6px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-artist {
+  margin-top: 10px;
+  font-family: var(--tm-artist);
+  font-size: 70px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.tm-tour {
+  margin-top: 14px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-venue {
+  margin-top: 12px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.tm-disclaim {
+  margin-top: 14px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.tm-datetime {
+  margin-top: 16px;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* ───── RIGHT STUB (920–1300, 380px wide) ─────
+   Layout (from left edge of stub):
+     0–180  : data column (codes / SEC ROW SEAT tags + values)
+     180–250: barcode column (vertical CODE128)
+     250–330: vertical Ticketmaster wordmark + yellow swoosh + URL
+     330–380: legal fine print
+*/
+.tm-right {
+  position: absolute;
+  left: 920px;
+  top: 0;
+  width: 380px;
+  height: 100%;
+  background: var(--tm-blue-tint);
+}
+
+.tm-r-top {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 175px;
+  height: 48px;
+  padding: 8px 14px;
+  background: var(--tm-blue-hdr);
+  font-size: 30px;
+}
+
+.tm-r-toplbl {
+  position: absolute;
+  left: 0;
+  top: 48px;
+  width: 175px;
+  height: 24px;
+  padding: 6px 14px;
+  background: var(--tm-blue);
+  color: #fff;
+  font-family: var(--tm-label);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tm-r-evnum {
+  position: absolute;
+  left: 14px;
+  top: 86px;
+  font-size: 30px;
+}
+
+.tm-r-cn {
+  position: absolute;
+  left: 14px;
+  top: 140px;
+  font-size: 30px;
+}
+
+/* SEC / ROW / SEAT mini-grid on right stub.
+   3-column grid: [blue tag] [big value] [aux text].
+     row 1: SEC. | FLR 3   | —
+     row 2: ROW  | 14      | CA404SJA   (auxRight)
+     row 3: —    | —       | V 180.00   (priceRight, between ROW and SEAT)
+     row 4: SEAT | [1]     | — */
+.tm-r-grid {
+  position: absolute;
+  left: 12px;
+  top: 188px;
+  width: 188px;
+  display: grid;
+  grid-template-columns: 46px 78px 1fr;
+  grid-auto-rows: auto;
+  align-items: center;
+  row-gap: 8px;
+  column-gap: 6px;
+}
+
+.tm-r-grid > * {
+  white-space: nowrap;
+}
+
+.tm-r-tag {
+  display: inline-block;
+  background: var(--tm-blue);
+  color: #fff;
+  font-family: var(--tm-label);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 6px;
+  text-align: center;
+  letter-spacing: 0.04em;
+  align-self: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.tm-r-val {
+  font-size: 30px;
+  align-self: center;
+}
+
+.tm-r-side {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  align-self: end;
+  padding-bottom: 2px;
+}
+
+.tm-r-seat-box {
+  display: inline-block;
+  background: var(--tm-blue);
+  color: #fff;
+  padding: 2px 12px;
+  font-size: 28px;
+  width: fit-content;
+}
+
+/* Barcode column — vertical bars + printed digits beside them. */
+.tm-scan {
+  position: absolute;
+  left: 205px;
+  top: 18px;
+  width: 70px;
+  height: 540px;
+}
+
+.tm-barcode {
+  position: absolute;
+  left: 6px;
+  top: 8px;
+  width: 48px;
+  height: 470px;
+  display: block;
+}
+
+.tm-barcode-num {
+  position: absolute;
+  left: 58px;
+  top: 30px;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--tm-mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #000;
+  height: 430px;
+}
+
+/* Brand strip (far right) */
+/* Brand block — vertical wordmark, swoosh, URL, fine print stacked from
+   x≈282 (just right of barcode column) to the right edge. */
+.tm-brand {
+  position: absolute;
+  left: 282px;
+  top: 0;
+  width: 98px;
+  height: 100%;
+}
+
+/* Vertical Ticketmaster wordmark. writing-mode: sideways-lr renders text so
+   you tilt your head LEFT to read — matching the reference photo. */
+.tm-logo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 56px;
+  writing-mode: sideways-lr;
+  font-family: var(--tm-brand);
+  font-size: 44px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--tm-blue-dark);
+  letter-spacing: -0.035em;
+  line-height: 1;
+  text-align: center;
+  padding: 16px 0;
+  box-sizing: border-box;
+  text-transform: lowercase;
+}
+
+.tm-swoosh {
+  position: absolute;
+  left: 56px;
+  top: 80px;
+  width: 6px;
+  height: 380px;
+  background: var(--tm-yellow);
+}
+
+.tm-brand-url {
+  position: absolute;
+  left: 62px;
+  top: 0;
+  bottom: 0;
+  width: 22px;
+  writing-mode: sideways-lr;
+  font-family: var(--tm-brand);
+  font-size: 16px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--tm-blue-dark);
+  letter-spacing: 0.015em;
+  line-height: 1.25;
+  text-align: center;
+  padding: 70px 0;
+  box-sizing: border-box;
+  text-transform: lowercase;
+}
+
+.tm-legal {
+  position: absolute;
+  right: 6px;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  writing-mode: sideways-lr;
+  font-family: var(--tm-label);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  color: var(--tm-ink);
+  text-align: center;
+  padding: 22px 0;
+  box-sizing: border-box;
+}
+
+/* Preview scaling — render at intrinsic 1300×589 and scale to fit.
+   Default 0.75× (975×442) shows print-accurate proportions; layout falls back
+   to 0.55× on narrow viewports so the full ticket stays visible. */
+.stub-stage {
+  width: 975px;
+  height: 442px;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.stub-stage .tm {
+  transform: scale(0.75);
+  transform-origin: top left;
+}
+
+@media (max-width: 1100px) {
+  .stub-stage {
+    width: 715px;
+    height: 324px;
+  }
+  .stub-stage .tm {
+    transform: scale(0.55);
+  }
+}
+
+@media (max-width: 760px) {
+  .stub-stage {
+    width: 100%;
+    max-width: 520px;
+    height: 236px;
+  }
+  .stub-stage .tm {
+    transform: scale(0.4);
+  }
+}
+
+.stub-preview-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0.5rem;
+  background: #2a2630;
+  border-radius: 10px;
+}
+
+.tm,
+.tm * {
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+@media print {
+  body {
+    margin: 0;
+    background: #fff !important;
+  }
+  body * { visibility: hidden; }
+  .stub-preview-wrap,
+  .stub-preview-wrap * { visibility: visible; }
+  .stub-preview-wrap {
+    position: absolute;
+    left: 0;
+    top: 0;
+    padding: 0;
+    background: #fff;
+    border-radius: 0;
+  }
+  .stub-stage {
+    width: 1300px;
+    height: 589px;
+    border: 0;
+    overflow: visible;
+  }
+  .stub-stage .tm {
+    transform: none !important;
+  }
+  @page {
+    size: 4.33in 1.96in;
+    margin: 0;
+  }
+}
