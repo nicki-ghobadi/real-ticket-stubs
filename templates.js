@@ -23,6 +23,102 @@ function shortDate(datetime) {
   return `${day}${mon}${yr}`;
 }
 
+/** Canonical form/stub field names (must match index.html input `name`s). */
+export const TICKET_FIELD_KEYS = [
+  "ticketCode", "headerRight", "section", "row", "seat", "price",
+  "admissionType", "aisle", "eventNum", "auxLeft", "auxRight",
+  "orderCode", "cn", "promo", "eventLine2", "tour", "venue",
+  "disclaimer", "datetime", "dateShort", "barcode",
+];
+
+/** Map common AI/OCR key variants → canonical stub field names. */
+const FIELD_ALIASES = new Map([
+  ["artist", "eventLine2"],
+  ["event", "eventLine2"],
+  ["eventtitle", "eventLine2"],
+  ["event_title", "eventLine2"],
+  ["eventname", "eventLine2"],
+  ["eventline2", "eventLine2"],
+  ["eventline", "eventLine2"],
+  ["title", "eventLine2"],
+  ["performer", "eventLine2"],
+  ["tourname", "tour"],
+  ["subtitle", "tour"],
+  ["venuename", "venue"],
+  ["location", "venue"],
+  ["date", "datetime"],
+  ["datetime", "datetime"],
+  ["date_time", "datetime"],
+  ["eventdate", "datetime"],
+  ["eventtime", "datetime"],
+  ["dateshort", "dateShort"],
+  ["shortdate", "dateShort"],
+  ["ticketcode", "ticketCode"],
+  ["eventcode", "ticketCode"],
+  ["headerright", "headerRight"],
+  ["header_right", "headerRight"],
+  ["admission", "admissionType"],
+  ["admissiontype", "admissionType"],
+  ["admissioncode", "admissionType"],
+  ["eventnum", "eventNum"],
+  ["eventnumber", "eventNum"],
+  ["event_num", "eventNum"],
+  ["ordercode", "orderCode"],
+  ["order_code", "orderCode"],
+  ["confirmation", "orderCode"],
+  ["auxleft", "auxLeft"],
+  ["auxright", "auxRight"],
+  ["barcodenumber", "barcode"],
+  ["barcode_num", "barcode"],
+  ["sectionaisle", "section"],
+  ["sec", "section"],
+]);
+
+function compactKey(raw) {
+  return String(raw).toLowerCase().replace(/[\s._-]+/g, "");
+}
+
+function resolveFieldKey(rawKey) {
+  const compact = compactKey(rawKey);
+  if (FIELD_ALIASES.has(compact)) return FIELD_ALIASES.get(compact);
+  return TICKET_FIELD_KEYS.find((k) => compactKey(k) === compact) || null;
+}
+
+function assignField(out, key, value) {
+  const s = String(value ?? "").trim();
+  if (s) out[key] = s;
+}
+
+/** Normalize vision/OCR JSON into the flat field map the stub form expects. */
+export function normalizeExtractedFields(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+
+  const root = raw.ticket || raw.fields || raw.data || raw;
+  const sources = [root, raw];
+  const out = {};
+
+  for (const source of sources) {
+    if (!source || typeof source !== "object" || Array.isArray(source)) continue;
+    for (const [rawKey, rawVal] of Object.entries(source)) {
+      if (rawKey.startsWith("_")) continue;
+
+      // Flatten one-level nests: { seating: { section: "117" } }
+      if (rawVal && typeof rawVal === "object" && !Array.isArray(rawVal)) {
+        for (const [subKey, subVal] of Object.entries(rawVal)) {
+          const key = resolveFieldKey(subKey);
+          if (key) assignField(out, key, subVal);
+        }
+        continue;
+      }
+
+      const key = resolveFieldKey(rawKey);
+      if (key) assignField(out, key, rawVal);
+    }
+  }
+
+  return out;
+}
+
 export function defaultFields() {
   return {
     ticketCode: "SJ0718",

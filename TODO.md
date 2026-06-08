@@ -4,8 +4,8 @@ Track implementation status here. Matching `TODO:` comments live in the codebase
 
 ## Payments & orders
 
-- [ ] **Stripe Checkout** — Replace mock card form with Stripe Payment Element / Checkout Session (`server.mjs`, `app.js`)
-- [ ] **Stripe webhooks** — Confirm payment before fulfillment; handle `payment_intent.succeeded` (`server.mjs`)
+- [x] **Stripe Checkout** — Stripe-hosted Checkout Session via `/api/create-checkout-session`; client redirects to Stripe (`server.mjs`, `app.js`)
+- [x] **Stripe webhooks** — Signature-verified `/api/stripe/webhook` handling `checkout.session.completed` (`server.mjs`). TODO: do the actual fulfillment inside the handler.
 - [ ] **Order persistence** — Store orders in a database (Supabase, Postgres, etc.) instead of console.log only (`server.mjs`)
 - [ ] **Order confirmation email** — Send email with confirmation # and shipping summary (Resend, SendGrid, etc.) (`server.mjs`)
 
@@ -18,9 +18,9 @@ Track implementation status here. Matching `TODO:` comments live in the codebase
 
 ## Ticket extraction (AI / OCR)
 
-- [ ] **Production `OPENAI_API_KEY`** — Set on host (Railway, Fly, Render, etc.); never expose to browser (`server.mjs`)
-- [ ] **Extract rate limiting** — Throttle `/api/extract` per IP/session (`server.mjs`)
-- [ ] **Upload size limits** — Cap image payload size on server (`server.mjs`)
+- [ ] **Production `ANTHROPIC_API_KEY`** — Set on host (Railway, Fly, Render, etc.); never expose to browser (`server.mjs`)
+- [x] **Extract rate limiting** — Per-IP fixed-window throttling on all API routes (`server.mjs`)
+- [x] **Upload size limits** — Body caps + image type/size validation on `/api/extract` (`server.mjs`)
 
 ## Fulfillment
 
@@ -29,9 +29,14 @@ Track implementation status here. Matching `TODO:` comments live in the codebase
 
 ## Security & ops
 
-- [ ] **HTTPS only** — Enforce TLS in production reverse proxy
-- [ ] **CORS / CSRF** — Lock API origins when deployed
-- [ ] **Secrets** — `.env` for all keys; document in `.env.example`
+- [x] **Static file allowlist** — Server only serves whitelisted assets (closed the `.env`/source disclosure hole) (`server.mjs`)
+- [x] **Security headers** — CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors` (`server.mjs`)
+- [x] **Request hardening** — Body size caps, request/headers timeouts (Slowloris), generic error responses (`server.mjs`)
+- [x] **CORS** — Origin allowlist via `ALLOWED_ORIGINS` + preflight handling (`server.mjs`)
+- [x] **Secrets** — `.env` git-ignored + auto-loaded; variables documented in `README.md`
+- [ ] **HTTPS only** — Enforce TLS in production reverse proxy / platform (see DEPLOYMENT.md)
+- [ ] **Upstream WAF/CDN** — Cloudflare (or similar) in front for real volumetric DDoS protection (see DEPLOYMENT.md)
+- [ ] **Distributed rate limiting** — Move the in-memory limiter to Redis for multi-instance deploys (`server.mjs`)
 - [ ] **Logging & monitoring** — Structured logs + error tracking (Sentry)
 - [ ] **CI** — GitHub Action: lint + validation unit tests
 

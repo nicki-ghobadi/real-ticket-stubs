@@ -7,5 +7,11 @@
     "start": "node server.mjs",
     "dev": "node server.mjs"
   },
-  "description": "Real Ticket Stubs — screenshot to print-ready Ticketmaster thermal stub"
+  "description": "Real Ticket Stubs — screenshot to print-ready Ticketmaster thermal stub",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "stripe": "^22.2.0"
+  }
 }

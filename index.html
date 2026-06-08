@@ -34,6 +34,7 @@
         </div>
 
         <div class="actions">
+          <button type="button" class="btn btn-ghost" id="upload-btn">Upload screenshot</button>
           <button type="button" class="btn btn-primary" id="extract-btn" disabled>Extract details</button>
         </div>
 
@@ -107,10 +108,15 @@
               <div class="choice-price">Free</div>
               <div class="choice-meta">Send to your own printer. Best on white card stock.</div>
             </button>
-            <button type="button" class="choice choice-primary" data-action="order">
+            <button type="button" class="choice choice-primary" data-action="order" data-product="mail">
               <div class="choice-title">Mail me a printed stub</div>
-              <div class="choice-price">$2.99</div>
+              <div class="choice-price">$3.99</div>
               <div class="choice-meta">Thermal-style cardstock, perforated, shipped in 3–5 days.</div>
+            </button>
+            <button type="button" class="choice" data-action="order" data-product="framed">
+              <div class="choice-title">Framed stub for the wall</div>
+              <div class="choice-price">$29.99</div>
+              <div class="choice-meta">Printed stub mounted in a nice frame, ready to hang.</div>
             </button>
           </div>
         </section>
@@ -171,27 +177,25 @@
           </form>
         </section>
 
-        <!-- Step 3: payment -->
+        <!-- Step 3: payment (Stripe-hosted Checkout) -->
         <section class="modal-step" data-step="pay" hidden>
           <h2>Payment</h2>
-          <p class="modal-sub">Secure checkout. Charges appear as "REAL TICKET STUBS".</p>
+          <p class="modal-sub">Secure checkout powered by Stripe. Charges appear as "REAL TICKET STUBS".</p>
 
           <div class="order-summary">
-            <div class="row"><span>Printed stub mailed (1x)</span><span>$2.99</span></div>
-            <div class="row total"><span>Total</span><span>$2.99</span></div>
+            <div class="row"><span id="pay-summary-label">Printed stub mailed (1x)</span><span id="pay-summary-price">$3.99</span></div>
+            <div class="row total"><span>Total</span><span id="pay-summary-total">$3.99</span></div>
           </div>
 
-          <form id="payment-form" class="modal-form" novalidate>
-            <label class="full">Cardholder name<input name="cardName" type="text" autocomplete="cc-name" required /></label>
-            <label class="full">Card number<input name="cardNumber" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="1234 5678 9012 3456" required /></label>
-            <label>Expiry<input name="cardExp" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" required /></label>
-            <label>CVC<input name="cardCvc" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123" required /></label>
+          <p class="modal-sub" id="pay-redirect-note">
+            You'll be securely redirected to Stripe to enter your card details, then brought back here.
+          </p>
+          <p class="form-banner err hidden" id="pay-error" role="alert"></p>
 
-            <div class="modal-actions full">
-              <button type="button" class="btn btn-ghost" data-back>Back</button>
-              <button type="submit" class="btn btn-primary" id="pay-btn">Pay $2.99 and place order</button>
-            </div>
-          </form>
+          <div class="modal-actions full">
+            <button type="button" class="btn btn-ghost" data-back>Back</button>
+            <button type="button" class="btn btn-primary" id="pay-btn">Pay with Stripe</button>
+          </div>
         </section>
 
         <!-- Step 4: success -->
@@ -201,7 +205,7 @@
           <div class="order-summary">
             <div class="row"><span>Confirmation #</span><span id="success-confirm">—</span></div>
             <div class="row"><span>Shipping to</span><span id="success-address">—</span></div>
-            <div class="row total"><span>Charged</span><span>$2.99</span></div>
+            <div class="row total"><span>Charged</span><span id="success-charged">—</span></div>
           </div>
           <div class="modal-actions full">
             <button type="button" class="btn btn-primary" data-close>Done</button>

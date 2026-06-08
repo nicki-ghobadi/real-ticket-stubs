@@ -4,6 +4,7 @@
  */
 import {
   defaultFields,
+  normalizeExtractedFields,
   prepareTicketData,
   buildTicketHtml,
 } from "./templates.js";
@@ -11,6 +12,17 @@ import { validateShippingFormat } from "./shipping-validation.js";
 
 const $ = (sel) => document.querySelector(sel);
 const form = $("#ticket-form");
+
+// API base URL. Defaults to same-origin (works when the whole app — frontend +
+// backend — is served together, including inside a GoHighLevel iframe embed).
+// To host the frontend on GoHighLevel and the backend elsewhere, set
+// `window.RTS_CONFIG = { apiBase: "https://your-backend.example.com" }` before
+// this script loads, and add that origin to ALLOWED_ORIGINS on the server.
+const API_BASE = (window.RTS_CONFIG && window.RTS_CONFIG.apiBase
+  ? String(window.RTS_CONFIG.apiBase)
+  : ""
+).replace(/\/$/, "");
+const api = (path) => `${API_BASE}${path}`;
 
 const state = {
   imageDataUrl: null,
@@ -32,9 +44,12 @@ function readForm() {
 }
 
 function fillForm(fields) {
+  if (!form) return;
   for (const [key, value] of Object.entries(fields)) {
     const input = form.elements.namedItem(key);
-    if (input) input.value = value ?? "";
+    if (input && "value" in input) {
+      input.value = value ?? "";
+    }
   }
 }
 
@@ -517,7 +532,7 @@ async function runOcr(dataUrl) {
 }
 
 async function runVision(dataUrl) {
-  const res = await fetch("/api/extract", {
+  const res = await fetch(api("/api/extract"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image: dataUrl }),
@@ -576,16 +591,19 @@ async function extract() {
     const visionFields = visionRes.status === "fulfilled" ? visionRes.value : {};
     const ocrFields =
       ocrText.status === "fulfilled" ? parseOcrText(ocrText.value) : {};
-    const fields = mergeFields(visionFields, ocrFields);
+    const merged = mergeFields(visionFields, ocrFields);
+    const fields = normalizeExtractedFields(merged);
 
     if (visionRes.status === "rejected") {
       console.warn("Server extract unavailable:", visionRes.reason);
     }
 
     state.fields = { ...blankFields(), ...fields };
-    fillForm(state.fields);
     $("#edit-panel").classList.remove("hidden");
+    fillForm(state.fields);
+    // Render from state.fields (source of truth) and sync form → stub again.
     renderStub(state.fields);
+    requestAnimationFrame(() => renderStub(readForm()));
 
     console.log("[extract] final fields:", state.fields);
 
@@ -620,6 +638,11 @@ async function extract() {
 function initUpload() {
   const dropzone = $("#dropzone");
   const input = $("#file-input");
+  const uploadBtn = $("#upload-btn");
+
+  if (uploadBtn) {
+    uploadBtn.addEventListener("click", () => input.click());
+  }
 
   dropzone.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -655,16 +678,52 @@ function initActions() {
 
 // ───────────────────────── Order modal ─────────────────────────
 // Multi-step flow triggered by the "Print stub" button:
-//   choose  → print at home (just window.print)  or  order printed stub
+//   choose  → print at home (free)  or  mail a stub ($3.99)  or  framed ($29.99)
 //   address → shipping form, validated client + server
-//   pay     → mock card form (TODO: Stripe Payment Element)
+//   pay     → redirect to Stripe-hosted Checkout
 //   success → confirmation # + masked address
-// TODO(production): Replace mock payment form with Stripe.js / Checkout.
 // TODO(production): Address autocomplete on street1 (Google Places / Mapbox).
 
-const ORDER_PRICE = 2.99;
-const ORDER_PRICE_LABEL = `$${ORDER_PRICE.toFixed(2)}`;
-const order = { shipping: null, confirmation: null };
+// Product catalog — keep in sync with PRODUCTS in server.mjs.
+const PRODUCTS = {
+  mail: { label: "Printed stub mailed (1x)", price: 3.99 },
+  framed: { label: "Framed stub for the wall (1x)", price: 29.99 },
+};
+const money = (n) => `$${Number(n).toFixed(2)}`;
+const order = { product: null, shipping: null, confirmation: null };
+
+// Stripe Payment Links — loaded from the server (/api/config), which reads
+// STRIPE_PAYMENT_LINK_MAIL and STRIPE_PAYMENT_LINK_FRAMED from .env.
+// Never hardcode link URLs here; they would be committed to git.
+let paymentLinks = { mail: "", framed: "" };
+const isStripeLink = (u) => typeof u === "string" && /^https:\/\/[^/]*stripe\.com\//i.test(u);
+
+async function loadAppConfig() {
+  try {
+    const res = await fetch(api("/api/config"));
+    if (!res.ok) return;
+    const cfg = await res.json().catch(() => ({}));
+    if (cfg.paymentLinks && typeof cfg.paymentLinks === "object") {
+      paymentLinks = { ...paymentLinks, ...cfg.paymentLinks };
+    }
+  } catch (e) {
+    console.warn("Could not load payment link config:", e);
+  }
+}
+
+// Navigate to Stripe. If we're inside an iframe (e.g. embedded in GoHighLevel),
+// break out to the top window — Stripe-hosted pages refuse to load in iframes.
+function goToStripe(url) {
+  try {
+    if (window.top && window.top !== window.self) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch {
+    /* cross-origin top: fall through to same-window navigation */
+  }
+  window.location.href = url;
+}
 
 function openOrderModal() {
   const modal = $("#order-modal");
@@ -742,7 +801,7 @@ function showAddressFieldErrors(form, errors) {
 }
 
 async function validateShippingWithServer(data) {
-  const res = await fetch("/api/validate-shipping", {
+  const res = await fetch(api("/api/validate-shipping"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -760,54 +819,35 @@ function readFormData(form) {
   return data;
 }
 
-function maskCardNumber(num) {
-  const d = String(num || "").replace(/\D/g, "");
-  if (d.length < 4) return "****";
-  return `**** **** **** ${d.slice(-4)}`;
-}
-
-async function submitOrder(payment) {
-  const stage = $("#stub-stage");
-  const stubHtml = stage?.innerHTML || "";
+/** Create a Stripe Checkout Session for the chosen product and return either
+ *  { url } (redirect to Stripe) or { mock, confirmation } (demo fallback when
+ *  the server has no STRIPE_SECRET_KEY configured). */
+async function createCheckoutSession() {
   const payload = {
+    product: order.product,
     shipping: order.shipping,
-    payment: {
-      cardName: payment.cardName,
-      cardLast4: maskCardNumber(payment.cardNumber).slice(-4),
-    },
     item: {
       artist: state.fields.eventLine2 || "",
       venue: state.fields.venue || "",
       datetime: state.fields.datetime || "",
-      total: ORDER_PRICE,
     },
-    stubHtml,
   };
 
-  try {
-    const res = await fetch("/api/order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (res.status === 400 && json.errors) {
-      const err = new Error(json.error || "Shipping address could not be verified.");
-      err.errors = json.errors;
-      throw err;
-    }
-    if (res.ok) {
-      return json.confirmation;
-    }
-    throw new Error(json.error || `Order failed (${res.status})`);
-  } catch (e) {
-    if (e.errors) throw e;
-    // Network failure only — demo fallback when the server is unreachable.
-    if (e instanceof TypeError) {
-      return "RTS-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-    }
-    throw e;
+  const res = await fetch(api("/api/create-checkout-session"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (res.status === 400 && json.errors) {
+    const err = new Error(json.error || "Shipping address could not be verified.");
+    err.errors = json.errors;
+    throw err;
   }
+  if (!res.ok) {
+    throw new Error(json.error || `Checkout failed (${res.status})`);
+  }
+  return json;
 }
 
 function initOrderModal() {
@@ -827,8 +867,26 @@ function initOrderModal() {
     closeOrderModal();
     setTimeout(() => window.print(), 60);
   });
-  modal.querySelector('.choice[data-action="order"]').addEventListener("click", () => {
-    showStep("address");
+  modal.querySelectorAll('.choice[data-action="order"]').forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const productKey = btn.dataset.product;
+      if (!PRODUCTS[productKey]) return;
+      order.product = productKey;
+
+      // If a Stripe Payment Link is configured for this product, hand off to it.
+      // Stripe collects the shipping address, email, and payment, then redirects
+      // back to the URL configured on the link.
+      const link = paymentLinks[productKey];
+      if (isStripeLink(link)) {
+        closeOrderModal();
+        goToStripe(link);
+        return;
+      }
+
+      // Otherwise fall back to in-app address verification + API Checkout.
+      updatePaySummary();
+      showStep("address");
+    });
   });
 
   // Back buttons on address + pay.
@@ -890,40 +948,116 @@ function initOrderModal() {
     e.target.removeAttribute("aria-invalid");
   });
 
-  // Step 3 — payment.
-  $("#payment-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (!markInvalid(e.target)) return;
+  // Step 3 — payment via Stripe-hosted Checkout.
+  $("#pay-btn").addEventListener("click", async () => {
     const payBtn = $("#pay-btn");
-    const payment = readFormData(e.target);
+    const payErr = $("#pay-error");
+    payErr.textContent = "";
+    payErr.classList.add("hidden");
     payBtn.disabled = true;
-    payBtn.textContent = "Processing...";
+    payBtn.textContent = "Starting secure checkout…";
     try {
-      const confirmation = await submitOrder(payment);
-      order.confirmation = confirmation;
-      $("#success-confirm").textContent = confirmation;
-      $("#success-email").textContent = order.shipping?.email || "your email";
-      const s = order.shipping || {};
-      $("#success-address").textContent =
-        `${s.name || ""}, ${s.street1 || ""}${s.street2 ? ", " + s.street2 : ""}, ${s.city || ""} ${s.state || ""} ${s.zip || ""}`.replace(/\s+/g, " ").trim();
-      showStep("success");
+      const result = await createCheckoutSession();
+      if (result.url) {
+        // Hand off to Stripe's hosted payment page (breaks out of an iframe).
+        goToStripe(result.url);
+        return;
+      }
+      // Demo fallback (no STRIPE_SECRET_KEY configured on the server).
+      order.confirmation = result.confirmation;
+      showSuccess({
+        confirmation: result.confirmation,
+        email: order.shipping?.email,
+      });
     } catch (err) {
       if (err?.errors) {
         showStep("address");
         showAddressFieldErrors($("#address-form"), err.errors);
-        alert(err.message || "Please fix your shipping address and try again.");
       } else {
-        alert("Payment failed: " + (err?.message || err));
+        payErr.textContent = err?.message || "Could not start checkout. Try again.";
+        payErr.classList.remove("hidden");
       }
     } finally {
       payBtn.disabled = false;
-      payBtn.textContent = `Pay ${ORDER_PRICE_LABEL} and place order`;
+      payBtn.textContent = "Pay with Stripe";
     }
   });
 }
 
-initUpload();
-initActions();
-initOrderModal();
-fillForm(state.fields);
-renderStub(state.fields);
+/** Update the order summary shown on the payment step from the chosen product. */
+function updatePaySummary() {
+  const p = PRODUCTS[order.product];
+  if (!p) return;
+  const price = money(p.price);
+  const label = $("#pay-summary-label");
+  const sPrice = $("#pay-summary-price");
+  const total = $("#pay-summary-total");
+  const payBtn = $("#pay-btn");
+  if (label) label.textContent = p.label;
+  if (sPrice) sPrice.textContent = price;
+  if (total) total.textContent = price;
+  if (payBtn) payBtn.textContent = "Pay with Stripe";
+}
+
+/** Render the success step (used by both Stripe return + demo fallback). */
+function showSuccess({ confirmation, email, charged }) {
+  $("#success-confirm").textContent = confirmation || "—";
+  $("#success-email").textContent = email || order.shipping?.email || "your email";
+  const s = order.shipping || {};
+  const addr =
+    `${s.name || ""}, ${s.street1 || ""}${s.street2 ? ", " + s.street2 : ""}, ${s.city || ""} ${s.state || ""} ${s.zip || ""}`
+      .replace(/\s+/g, " ")
+      .trim();
+  $("#success-address").textContent = addr.replace(/^,\s*/, "") || "—";
+  const chargedEl = $("#success-charged");
+  if (chargedEl) {
+    const fallback = order.product ? money(PRODUCTS[order.product].price) : "—";
+    chargedEl.textContent = charged || fallback;
+  }
+  const modal = $("#order-modal");
+  if (!modal.classList.contains("open")) openOrderModal();
+  showStep("success");
+}
+
+/** After Stripe redirects back to /?checkout=success|cancel, show the result. */
+async function handleCheckoutReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get("checkout");
+  if (!status) return;
+
+  // Clean the query string so a refresh doesn't re-trigger this.
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  if (status === "cancel") {
+    setStatus("Checkout canceled — your card was not charged.", "warn");
+    return;
+  }
+  if (status !== "success") return;
+
+  let info = {};
+  const sessionId = params.get("session_id");
+  if (sessionId) {
+    try {
+      const res = await fetch(api(`/api/checkout-session?id=${encodeURIComponent(sessionId)}`));
+      info = await res.json().catch(() => ({}));
+    } catch {
+      /* best-effort */
+    }
+  }
+  if (info.product && PRODUCTS[info.product]) order.product = info.product;
+  showSuccess({
+    confirmation: info.confirmation || "PAID",
+    email: info.email,
+    charged: typeof info.amountTotal === "number" ? money(info.amountTotal / 100) : undefined,
+  });
+}
+
+(async () => {
+  await loadAppConfig();
+  initUpload();
+  initActions();
+  initOrderModal();
+  fillForm(state.fields);
+  renderStub(state.fields);
+  handleCheckoutReturn();
+})();
