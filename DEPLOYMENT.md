@@ -112,6 +112,60 @@ Only do this if you want the markup to live directly in GHL (no iframe). It requ
 
 ---
 
+## Deploy to Vercel
+
+This app is a single Node HTTP server (`server.mjs`) that also serves the static
+frontend. Vercel's generic **Node server preset** detects a server that calls
+`server.listen()` and routes *all* traffic to it, passing native
+`IncomingMessage`/`ServerResponse` objects — so the security headers, static
+allowlist, and the **raw-body Stripe webhook** all keep working unchanged.
+
+### Steps
+
+1. Push the repo to GitHub (already done).
+2. In Vercel → **Add New… → Project** → import the repo.
+3. **Framework Preset:** leave as **Other** (Vercel auto-detects the Node server
+   from `server.mjs` + `npm start`). No `vercel.json` is required.
+4. **Environment Variables** (Project → Settings → Environment Variables) — add
+   the same keys from your `.env`, for the **Production** environment:
+   - `ANTHROPIC_API_KEY`, `ANTHROPIC_VISION_MODEL`
+   - `STRIPE_PAYMENT_LINK_MAIL`, `STRIPE_PAYMENT_LINK_FRAMED`
+   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (only if using API Checkout / webhook)
+   - `GOOGLE_ADDRESS_VALIDATION_API_KEY` (optional)
+   - `NODE_ENV=production`
+   - `FRAME_ANCESTORS` (set to your GHL domain if embedding, else `'self'`)
+   - Do **not** set `PORT` — Vercel assigns it.
+5. **Raise the function timeout.** The Claude vision call (plus the seating
+   retry) can exceed Vercel's **10 s default**. Go to Project → **Settings →
+   Functions → Max Duration** and set it to **60 s** (the Hobby ceiling).
+   > For a captured Node server you set this in the dashboard, *not* via
+   > `vercel.json` `functions` (that key only applies to file-based `/api`
+   > functions).
+6. **Deploy.** Then verify `https://<your-app>.vercel.app/healthz` returns
+   `{"status":"ok","ai":true,...}`.
+7. **Stripe webhook:** in the Stripe Dashboard, set the endpoint URL to
+   `https://<your-app>.vercel.app/api/stripe/webhook` and copy the new signing
+   secret into `STRIPE_WEBHOOK_SECRET`, then redeploy.
+8. **Custom domain:** Project → Settings → Domains → add `realticketstubs.com`
+   and follow the DNS instructions (Vercel issues TLS automatically).
+
+### Vercel-specific caveats
+
+- **Rate limiting is per-instance.** The in-memory limiter resets on cold starts
+  and isn't shared across concurrent serverless instances, so it's best-effort on
+  Vercel. For real limits, back it with **Upstash Redis** (Vercel marketplace,
+  free tier) or put **Cloudflare** in front (see below).
+- **Cold starts** add ~0.3–1 s latency to the first request after idle.
+- **Stateless only** — never write to local disk for anything you need to keep
+  (orders, etc.); use a database (e.g. Supabase/Postgres).
+
+> Prefer a persistent host (Render/Railway/Fly) if you want the in-memory rate
+> limiter to actually hold and to avoid per-request timeout limits — the same
+> `server.mjs` runs there unchanged. Vercel shines for the static frontend + a
+> global edge network.
+
+---
+
 ## Security hardening that's already built in
 
 | Protection | How |
@@ -120,9 +174,11 @@ Only do this if you want the markup to live directly in GHL (no iframe). It requ
 | **DoS via huge uploads** | Request body size caps (8 MB images; 64 KB JSON) |
 | **Slowloris** | `requestTimeout` / `headersTimeout` set |
 | **Abuse / cost-bombing** | Per-IP **rate limiting** on every API route (429 + `Retry-After`) |
-| **Clickjacking / XSS** | `Content-Security-Policy`, `frame-ancestors`, `X-Content-Type-Options`, escaped template output |
+| **Clickjacking / XSS** | `Content-Security-Policy`, `frame-ancestors`, `X-Frame-Options` (when not embedding), `X-Content-Type-Options`, escaped template output |
+| **Supply-chain (CDN tampering)** | CDN scripts pinned to exact versions with **Subresource Integrity** (`integrity` + `crossorigin`) |
 | **HTTPS enforcement** | `Strict-Transport-Security` (when `NODE_ENV=production`) + `upgrade-insecure-requests` |
 | **CORS** | Closed by default; opt-in per origin via `ALLOWED_ORIGINS` |
+| **Open redirect** | Stripe links validated to `https://*.stripe.com` on both server and client |
 | **Payment integrity** | Stripe **webhook signature verification**; address re-validated server-side before checkout |
 | **No SQL injection** | No SQL database; if you add one, use parameterized queries only |
 

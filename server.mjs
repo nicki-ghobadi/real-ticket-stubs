@@ -186,6 +186,10 @@ function securityHeaders(type) {
   };
   // HSTS only matters over HTTPS; safe to always send (ignored on http://).
   if (IS_PROD) h["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains";
+  // Legacy clickjacking guard for old browsers (CSP frame-ancestors handles
+  // modern ones). Only when embedding isn't explicitly allowed, since
+  // X-Frame-Options can't express an allowlist of external embedders.
+  if (FRAME_ANCESTORS.trim() === "'self'") h["X-Frame-Options"] = "SAMEORIGIN";
   return h;
 }
 

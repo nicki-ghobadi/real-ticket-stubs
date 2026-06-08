@@ -696,7 +696,15 @@ const order = { product: null, shipping: null, confirmation: null };
 // STRIPE_PAYMENT_LINK_MAIL and STRIPE_PAYMENT_LINK_FRAMED from .env.
 // Never hardcode link URLs here; they would be committed to git.
 let paymentLinks = { mail: "", framed: "" };
-const isStripeLink = (u) => typeof u === "string" && /^https:\/\/[^/]*stripe\.com\//i.test(u);
+const isStripeLink = (u) => {
+  if (typeof u !== "string") return false;
+  try {
+    const { protocol, hostname } = new URL(u);
+    return protocol === "https:" && /(^|\.)stripe\.com$/i.test(hostname);
+  } catch {
+    return false;
+  }
+};
 
 async function loadAppConfig() {
   try {
