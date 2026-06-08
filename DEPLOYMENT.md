@@ -221,12 +221,23 @@ them the app still runs and just logs. The startup banner shows their status.
 
 ### Confirmation emails — Resend
 
-1. Sign up at [resend.com](https://resend.com), **verify your sending domain**,
-   and create an API key.
-2. Set on the host:
-   - `RESEND_API_KEY`
-   - `ORDER_FROM_EMAIL` = an address on your verified domain (e.g. `orders@realticketstubs.com`)
-   - `SUPPORT_EMAIL`, `BUSINESS_NAME` (optional, used in the email + legal pages)
+1. Sign up at [resend.com](https://resend.com) → **Domains** → **Add Domain** →
+   enter `realticketstubs.com`.
+2. Resend shows DNS records (SPF, DKIM, etc.). Add them in your domain registrar
+   (or Cloudflare DNS if you use it). Wait until Resend shows **Verified**.
+3. **API Keys** → Create API Key → copy `re_...` into `.env` as `RESEND_API_KEY`.
+4. Set on the host:
+   - `ORDER_FROM_EMAIL=orders@realticketstubs.com`
+   - `SUPPORT_EMAIL=support@realticketstubs.com`
+   - `BUSINESS_NAME=Real Ticket Stubs`
+5. Smoke-test without Stripe:
+
+```bash
+npm run test:fulfillment -- --email=you@yourinbox.com
+```
+
+You should see a row in Supabase **Table Editor → orders** and a confirmation
+email in your inbox.
 
 ## Legal pages
 
