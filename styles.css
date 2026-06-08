@@ -245,6 +245,17 @@ code {
   font-size: 0.75rem;
   color: var(--muted);
 }
+.footer-links {
+  margin-top: 0.5rem;
+}
+.footer-links a {
+  color: var(--muted);
+  text-decoration: none;
+  margin: 0 0.15rem;
+}
+.footer-links a:hover {
+  text-decoration: underline;
+}
 
 /* ────────── Order modal ────────── */
 .modal {

@@ -44,7 +44,13 @@ flowchart LR
 | `STRIPE_PAYMENT_LINK_MAIL` | Yes (Payment Links) | `https://buy.stripe.com/...` for $3.99 mailed stub |
 | `STRIPE_PAYMENT_LINK_FRAMED` | Yes (Payment Links) | `https://buy.stripe.com/...` for $29.99 framed stub |
 | `STRIPE_WEBHOOK_SECRET` | Yes (before fulfilling orders) | `whsec_...` (Step 4) |
-| `STRIPE_SECRET_KEY` | Optional | Only for API Checkout fallback or webhook session retrieval |
+| `STRIPE_SECRET_KEY` | Recommended | Needed for the webhook to retrieve full order details (and API Checkout fallback) |
+| `SUPABASE_URL` | Yes (to store orders) | Project URL, e.g. `https://abc.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes (to store orders) | **Service role** key — server-only secret |
+| `RESEND_API_KEY` | Yes (to email customers) | From [resend.com](https://resend.com) |
+| `ORDER_FROM_EMAIL` | Yes (to email customers) | Address on your Resend-verified domain |
+| `SUPPORT_EMAIL` / `BUSINESS_NAME` | No | Shown in emails + legal pages |
+| `GOOGLE_ADDRESS_VALIDATION_API_KEY` | No | Enables post-payment deliverability checks |
 | `NODE_ENV` | Yes | `production` (enables HSTS) |
 | `FRAME_ANCESTORS` | Yes for GHL embed | Your GoHighLevel domain(s), e.g. `https://app.yourbrand.com` (space-separated for multiple) |
 | `ALLOWED_ORIGINS` | Only for split hosting | Leave empty for the iframe setup |
@@ -195,13 +201,48 @@ If you run **multiple instances**, move the in-memory rate limiter to **Redis** 
 
 ---
 
+## Order fulfillment (persistence + confirmation emails)
+
+The Stripe webhook (`handleCheckoutCompleted`) now records each paid order and
+emails the customer. Both integrations are **optional and env-gated** — without
+them the app still runs and just logs. The startup banner shows their status.
+
+### Order persistence — Supabase
+
+1. Create a Supabase project, open **SQL Editor**, and run
+   [`supabase/migrations/0001_orders.sql`](supabase/migrations/0001_orders.sql).
+   It creates a locked-down `orders` table (RLS on, no public policies).
+2. Set on the host:
+   - `SUPABASE_URL` = your project URL (e.g. `https://abc.supabase.co`)
+   - `SUPABASE_SERVICE_ROLE_KEY` = **service role** key (Settings → API). This is
+     a server-only secret — never put it in the browser or in `.env.example`.
+3. Writes are idempotent: `stripe_session_id` is `UNIQUE`, so a retried webhook
+   won't create a duplicate order or re-send the email.
+
+### Confirmation emails — Resend
+
+1. Sign up at [resend.com](https://resend.com), **verify your sending domain**,
+   and create an API key.
+2. Set on the host:
+   - `RESEND_API_KEY`
+   - `ORDER_FROM_EMAIL` = an address on your verified domain (e.g. `orders@realticketstubs.com`)
+   - `SUPPORT_EMAIL`, `BUSINESS_NAME` (optional, used in the email + legal pages)
+
+## Legal pages
+
+`/terms.html`, `/privacy.html`, and `/refunds.html` are served and linked in the
+footer. They are **templates** with `[bracketed placeholders]` — fill in your
+legal business name + contact email and have them reviewed before going live.
+
 ## Go-live checklist
 
 - [ ] `ANTHROPIC_API_KEY`, Payment Link env vars, `STRIPE_WEBHOOK_SECRET`, `NODE_ENV=production`, `FRAME_ANCESTORS` set on the host
-- [ ] `/healthz` returns `{"status":"ok","ai":true,"payments":true}`
+- [ ] `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` set and migration run (orders persist)
+- [ ] `RESEND_API_KEY` + `ORDER_FROM_EMAIL` set with a verified domain (emails send)
+- [ ] `/healthz` returns `{"status":"ok","ai":true,...}`; startup banner shows persistence + email **ON**
 - [ ] Stripe switched from **test** to **live** keys; a real test purchase succeeds end-to-end
-- [ ] Webhook endpoint shows successful deliveries in the Stripe Dashboard
-- [ ] Fulfillment + confirmation email implemented in the webhook handler
+- [ ] Webhook endpoint shows successful deliveries in the Stripe Dashboard; an order row appears + confirmation email arrives
+- [ ] Legal page placeholders filled in (business name, support email) and reviewed
 - [ ] App loads inside the GoHighLevel iframe (no `frame-ancestors`/CSP errors in the browser console)
-- [ ] Cloudflare (or other WAF/CDN) in front of the backend domain
-- [ ] Refund/terms/privacy links added to checkout (see `TODO.md` → Legal & product)
+- [ ] Cloudflare (or other WAF/CDN) in front of the backend domain (if not relying on Vercel's edge)
+- [ ] Print-job submission to your fulfillment partner wired in (remaining `TODO` in the webhook)

@@ -64,7 +64,12 @@ Creates **`real-ticket-stubs`** on your account and pushes `main`. Use `./script
 | `ALLOWED_ORIGINS` | Split hosting only | Comma-separated origins allowed via CORS. Empty = same-origin only. |
 | `TRUST_PROXY` | No | `true` (default) when behind a proxy/load balancer; reads real client IP. |
 | `PORT` | No | Default `3456` (most hosts set this automatically) |
-| `GOOGLE_ADDRESS_VALIDATION_API_KEY` | No | TODO: stricter deliverability checks |
+| `GOOGLE_ADDRESS_VALIDATION_API_KEY` | No | Post-payment deliverability check (Google Address Validation) |
+| `SUPABASE_URL` | To store orders | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | To store orders | Service-role key (server-only). Run `supabase/migrations/0001_orders.sql` |
+| `RESEND_API_KEY` | To email customers | [resend.com](https://resend.com) API key |
+| `ORDER_FROM_EMAIL` | To email customers | Sender on your Resend-verified domain |
+| `SUPPORT_EMAIL` / `BUSINESS_NAME` | No | Shown in confirmation emails + legal pages |
 | `USPS_USER_ID` | No | TODO: USPS address verification (US) |
 
 Copy the variables into a `.env` file in the project root (git-ignored). On deploy hosts, set the same names in the dashboard.

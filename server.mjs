@@ -9,6 +9,12 @@ import { fileURLToPath } from "node:url";
 import Stripe from "stripe";
 import { validateShippingComplete, validateAddressWithGoogle } from "./shipping-verify-server.mjs";
 import { normalizeExtractedFields } from "./templates.js";
+import {
+  saveOrder,
+  sendOrderConfirmation,
+  persistenceEnabled,
+  emailEnabled,
+} from "./fulfillment.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -128,6 +134,17 @@ const PRODUCTS = {
     amount: 2999, // $29.99
   },
 };
+
+/** Identify which product was bought. API Checkout sets metadata.product;
+ *  Payment Links don't, so fall back to matching the charged amount. */
+function productFromSession(session) {
+  const key = session?.metadata?.product;
+  if (key && PRODUCTS[key]) return { key, name: PRODUCTS[key].name };
+  const amount = session?.amount_total;
+  const match = Object.entries(PRODUCTS).find(([, p]) => p.amount === amount);
+  if (match) return { key: match[0], name: match[1].name };
+  return { key: "", name: "Ticket stub" };
+}
 
 /** Best-effort public origin for Stripe success/cancel redirects. */
 function getOrigin(req) {
@@ -477,6 +494,9 @@ const PUBLIC_FILES = new Map([
   ["/app.js", "app.js"],
   ["/templates.js", "templates.js"],
   ["/shipping-validation.js", "shipping-validation.js"],
+  ["/terms.html", "terms.html"],
+  ["/privacy.html", "privacy.html"],
+  ["/refunds.html", "refunds.html"],
 ]);
 
 /** Process a paid checkout: capture address, verify deliverability, fulfill.
@@ -497,37 +517,71 @@ async function handleCheckoutCompleted(sessionObj) {
 
     const ship = getShippingFromSession(session);
     const email = session?.customer_details?.email || session?.customer_email || "";
+    const product = productFromSession(session);
     console.log("✅ Payment completed:", {
       session: session?.id,
       email,
+      product: product.key,
       amount: session?.amount_total,
       ship,
     });
 
     // Post-payment deliverability check (does NOT block the charge — the money
     // is already captured; we surface bad addresses for review/refund instead).
+    let addressStatus = "unknown";
     if (ship && ADDRESS_VALIDATION) {
       const verdict = await validateAddressWithGoogle(ship);
       if (verdict.configured && verdict.ok) {
         if (verdict.deliverable) {
+          addressStatus = "deliverable";
           console.log("📦 Address verified deliverable:", verdict.formatted);
         } else {
+          addressStatus = "needs_review";
           console.warn("⚠️  ADDRESS NEEDS REVIEW (possibly undeliverable):", {
             entered: ship,
             granularity: verdict.granularity,
             unconfirmed: verdict.hasUnconfirmedComponents,
             suggestion: verdict.formatted,
           });
-          // TODO(production): flag this order for manual review and/or email the
-          // customer to confirm/fix their address before shipping.
         }
       } else if (verdict.configured) {
+        addressStatus = "check_error";
         console.warn("Address validation error:", verdict.error);
       }
     }
 
-    // TODO(production): persist the order, submit the print job to your
-    // fulfillment partner, and send a confirmation email to `email`.
+    // Assemble the canonical order record.
+    const order = {
+      sessionId: session?.id || "",
+      email,
+      productKey: product.key,
+      productName: product.name,
+      amountTotal: session?.amount_total ?? null,
+      currency: session?.currency || "usd",
+      shipping: ship,
+      ticket: {
+        artist: session?.metadata?.artist || "",
+        venue: session?.metadata?.venue || "",
+        datetime: session?.metadata?.datetime || "",
+      },
+      addressStatus,
+    };
+
+    // Persist (idempotent on the Stripe session id). Only send the confirmation
+    // email when this is a NEW order, so duplicate webhook deliveries don't
+    // double-email the customer.
+    const stored = await saveOrder(order);
+    if (stored.error) console.error("Order persistence error:", stored.error);
+
+    if (stored.created) {
+      const mail = await sendOrderConfirmation(order);
+      if (mail.error) console.error("Confirmation email error:", mail.error);
+      else if (mail.sent) console.log("✉️  Confirmation email sent to", email);
+    } else {
+      console.log("↩️  Duplicate webhook for", session?.id, "— skipping email.");
+    }
+
+    // TODO(production): submit the print job to your fulfillment partner.
   } catch (e) {
     console.error("handleCheckoutCompleted error:", e);
   }
@@ -826,6 +880,8 @@ server.listen(PORT, () => {
   const linkCount = [links.mail, links.framed].filter(Boolean).length;
   console.log(`  🔗 Payment links: ${linkCount}/2 configured (STRIPE_PAYMENT_LINK_MAIL / _FRAMED in .env)`);
   console.log(`  📦 Address deliverability check: ${ADDRESS_VALIDATION ? "Google Address Validation ON" : "off (set GOOGLE_ADDRESS_VALIDATION_API_KEY)"}`);
+  console.log(`  🗄  Order persistence: ${persistenceEnabled ? "Supabase ON" : "off (set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)"}`);
+  console.log(`  ✉️  Confirmation emails: ${emailEnabled ? "Resend ON" : "off (set RESEND_API_KEY + ORDER_FROM_EMAIL)"}`);
   console.log(`  🔒 CORS allowlist: ${ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS.join(", ") : "same-origin only"}`);
   console.log(`  🖼  frame-ancestors: ${FRAME_ANCESTORS}`);
   if (!IS_PROD) console.log("  ℹ️  Set NODE_ENV=production in production to enable HSTS.");
