@@ -131,7 +131,7 @@ function getPaymentLinksConfig() {
   };
 }
 
-// Product catalog — prices are in cents. Keep these in sync with app.js.
+// Product catalog — prices are in cents. Keep these in sync with client.js.
 const PRODUCTS = {
   mail: {
     name: "Printed ticket stub — mailed to you",
@@ -582,7 +582,7 @@ const PUBLIC_FILES = new Map([
   ["/index.html", "index.html"],
   ["/styles.css", "styles.css"],
   ["/ticket.css", "ticket.css"],
-  ["/app.js", "app.js"],
+  ["/client.js", "client.js"],
   ["/templates.js", "templates.js"],
   ["/shipping-validation.js", "shipping-validation.js"],
   ["/terms.html", "terms.html"],
