@@ -98,7 +98,7 @@
       </p>
     </footer>
 
-    <!-- ─────────── Order modal: choose / address / pay / confirmation ─────────── -->
+    <!-- ─────────── Order modal: shop / cart / confirmation ─────────── -->
     <div class="modal" id="order-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-backdrop" data-close></div>
       <div class="modal-card">
@@ -157,86 +157,14 @@
                 <span>Cart total</span>
                 <strong id="cart-total">$0.00</strong>
               </div>
-              <button type="button" class="btn btn-primary" id="cart-checkout-btn">Checkout</button>
+              <p class="form-banner err hidden" id="cart-checkout-error" role="alert"></p>
+              <button type="button" class="btn btn-primary" id="cart-checkout-btn">Checkout with Stripe</button>
             </div>
           </div>
+          <p class="modal-sub cart-note">Stripe securely collects your email and shipping address (US &amp; Canada). We verify deliverability after payment.</p>
         </section>
 
-        <!-- Step 2: shipping address -->
-        <section class="modal-step" data-step="address" hidden>
-          <h2>Shipping address</h2>
-          <p class="modal-sub">
-            We verify your email and mailing address before checkout (US &amp; Canada only).
-          </p>
-
-          <form id="address-form" class="modal-form" novalidate>
-            <p class="form-banner err hidden" id="address-form-banner" role="alert"></p>
-
-            <label class="full">Full name
-              <input name="name" type="text" autocomplete="name" required />
-              <span class="field-error" data-error-for="name"></span>
-            </label>
-            <label class="full">Email
-              <input name="email" type="email" autocomplete="email" required />
-              <span class="field-error" data-error-for="email"></span>
-            </label>
-            <label class="full">Confirm email
-              <input name="emailConfirm" type="email" autocomplete="email" required />
-              <span class="field-error" data-error-for="emailConfirm"></span>
-            </label>
-            <label class="full">Street address
-              <input name="street1" type="text" autocomplete="address-line1" required />
-              <span class="field-error" data-error-for="street1"></span>
-            </label>
-            <label class="full">Apt / Suite (optional)
-              <input name="street2" type="text" autocomplete="address-line2" />
-            </label>
-            <label>City
-              <input name="city" type="text" autocomplete="address-level2" required />
-              <span class="field-error" data-error-for="city"></span>
-            </label>
-            <label>State / Province
-              <input name="state" type="text" autocomplete="address-level1" placeholder="CA or California" required />
-              <span class="field-error" data-error-for="state"></span>
-            </label>
-            <label>ZIP / Postal
-              <input name="zip" type="text" autocomplete="postal-code" required />
-              <span class="field-error" data-error-for="zip"></span>
-            </label>
-            <label class="full">Country
-              <select name="country" autocomplete="country" required>
-                <option value="United States" selected>United States</option>
-                <option value="Canada">Canada</option>
-              </select>
-              <span class="field-error" data-error-for="country"></span>
-            </label>
-
-            <div class="modal-actions full">
-              <button type="button" class="btn btn-ghost" data-back>Back</button>
-              <button type="submit" class="btn btn-primary" id="address-continue-btn">Continue to payment</button>
-            </div>
-          </form>
-        </section>
-
-        <!-- Step 3: payment (Stripe-hosted Checkout) -->
-        <section class="modal-step" data-step="pay" hidden>
-          <h2>Payment</h2>
-          <p class="modal-sub">Secure checkout powered by Stripe. Charges appear as "REAL TICKET STUBS".</p>
-
-          <div class="order-summary" id="pay-summary"></div>
-
-          <p class="modal-sub" id="pay-redirect-note">
-            You'll be securely redirected to Stripe to enter your card details, then brought back here.
-          </p>
-          <p class="form-banner err hidden" id="pay-error" role="alert"></p>
-
-          <div class="modal-actions full">
-            <button type="button" class="btn btn-ghost" data-back>Back</button>
-            <button type="button" class="btn btn-primary" id="pay-btn">Pay with Stripe</button>
-          </div>
-        </section>
-
-        <!-- Step 4: success -->
+        <!-- Step 2: success -->
         <section class="modal-step" data-step="success" hidden>
           <h2>Order placed</h2>
           <p class="modal-sub">Your printed stub is on the way. We sent a confirmation to <strong id="success-email">your email</strong>.</p>

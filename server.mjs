@@ -2,6 +2,7 @@
  * Real Ticket Stubs — HTTP server.
  * @see TODO.md for production checklist (Stripe, fulfillment, rate limits, etc.)
  */
+import "./load-env.mjs";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,22 +19,7 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load `.env` from the project root (git-ignored). Node >= 20.12 has
-// process.loadEnvFile built in. On Render/Railway/Fly the host injects env
-// vars directly — no .env file needed there.
 const ENV_PATH = path.join(__dirname, ".env");
-try {
-  if (fs.existsSync(ENV_PATH)) {
-    if (typeof process.loadEnvFile === "function") {
-      process.loadEnvFile(ENV_PATH);
-    } else {
-      console.warn("Node >= 20.12 required for automatic .env loading.");
-    }
-  }
-} catch (e) {
-  console.warn("Could not load .env:", e.message);
-}
-
 const PORT = Number(process.env.PORT) || 3456;
 // 👉 ADD YOUR CLAUDE KEY: set ANTHROPIC_API_KEY in .env
 //    Get it at https://console.anthropic.com/settings/keys
@@ -54,6 +40,30 @@ const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 // Optional real-deliverability checking (Google Address Validation API).
 const ADDRESS_VALIDATION = !!process.env.GOOGLE_ADDRESS_VALIDATION_API_KEY;
 
+/** Format Stripe shipping for display on the success page. */
+function formatShippingDisplay(ship) {
+  if (!ship) return "";
+  return [ship.name, ship.line1, ship.line2, ship.city, ship.state, ship.postalCode, ship.country]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/** Map Stripe ISO country + address into our shipping validator shape. */
+function shippingForValidation(ship, email) {
+  if (!ship) return null;
+  const countryMap = { US: "United States", CA: "Canada" };
+  return {
+    name: ship.name || "",
+    email: email || "",
+    emailConfirm: email || "",
+    street1: ship.line1 || "",
+    street2: ship.line2 || "",
+    city: ship.city || "",
+    state: ship.state || "",
+    zip: ship.postalCode || "",
+    country: countryMap[String(ship.country || "").toUpperCase()] || ship.country || "",
+  };
+}
 /** Normalize the shipping address out of a Stripe Checkout Session. */
 function getShippingFromSession(session) {
   const sd =
@@ -607,27 +617,44 @@ async function handleCheckoutCompleted(sessionObj) {
       ship,
     });
 
-    // Post-payment deliverability check (does NOT block the charge — the money
-    // is already captured; we surface bad addresses for review/refund instead).
+    // Post-payment address checks (charge is already captured — flag bad addresses
+    // for manual review/refund rather than blocking payment).
     let addressStatus = "unknown";
-    if (ship && ADDRESS_VALIDATION) {
-      const verdict = await validateAddressWithGoogle(ship);
-      if (verdict.configured && verdict.ok) {
-        if (verdict.deliverable) {
-          addressStatus = "deliverable";
-          console.log("📦 Address verified deliverable:", verdict.formatted);
+    if (!ship) {
+      addressStatus = "missing";
+      console.warn("⚠️  No shipping address on completed checkout:", session?.id);
+    } else {
+      const forValidation = shippingForValidation(ship, email);
+      const verified = await validateShippingComplete(forValidation);
+      if (!verified.valid) {
+        addressStatus = "needs_review";
+        console.warn("⚠️  ADDRESS FAILED VERIFICATION:", {
+          entered: ship,
+          errors: verified.errors,
+        });
+      } else if (ADDRESS_VALIDATION) {
+        const verdict = await validateAddressWithGoogle(ship);
+        if (verdict.configured && verdict.ok) {
+          if (verdict.deliverable) {
+            addressStatus = "deliverable";
+            console.log("📦 Address verified deliverable:", verdict.formatted);
+          } else {
+            addressStatus = "needs_review";
+            console.warn("⚠️  ADDRESS NEEDS REVIEW (possibly undeliverable):", {
+              entered: ship,
+              granularity: verdict.granularity,
+              unconfirmed: verdict.hasUnconfirmedComponents,
+              suggestion: verdict.formatted,
+            });
+          }
+        } else if (verdict.configured) {
+          addressStatus = "check_error";
+          console.warn("Address validation error:", verdict.error);
         } else {
-          addressStatus = "needs_review";
-          console.warn("⚠️  ADDRESS NEEDS REVIEW (possibly undeliverable):", {
-            entered: ship,
-            granularity: verdict.granularity,
-            unconfirmed: verdict.hasUnconfirmedComponents,
-            suggestion: verdict.formatted,
-          });
+          addressStatus = "verified_basic";
         }
-      } else if (verdict.configured) {
-        addressStatus = "check_error";
-        console.warn("Address validation error:", verdict.error);
+      } else {
+        addressStatus = "verified_basic";
       }
     }
 
@@ -775,19 +802,6 @@ const server = http.createServer(async (req, res) => {
       const parsed = parseCartPayload(payload);
       if (parsed.error) return sendJson(res, 400, { error: parsed.error });
 
-      // Re-verify the shipping address server-side before taking payment.
-      const shippingIn = payload?.shipping || {};
-      const verified = await validateShippingComplete({
-        ...shippingIn,
-        emailConfirm: shippingIn.email,
-      });
-      if (!verified.valid) {
-        return sendJson(res, 400, {
-          error: "Shipping address could not be verified.",
-          errors: verified.errors,
-        });
-      }
-      const shipping = verified.normalized;
       const item = payload?.item || {};
 
       // Demo fallback for local dev only. Never mock payments in production.
@@ -807,20 +821,14 @@ const server = http.createServer(async (req, res) => {
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         line_items: parsed.lineItems,
-        customer_email: shipping.email,
+        // Email + shipping collected on Stripe's hosted page (no duplicate form in our app).
+        shipping_address_collection: { allowed_countries: ["US", "CA"] },
         success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?checkout=cancel`,
         metadata: {
           cart: parsed.productSummary,
           cart_json: parsed.cartJson.slice(0, 450),
           product: parsed.items.length === 1 ? parsed.items[0].product : "cart",
-          ship_name: shipping.name || "",
-          ship_street1: shipping.street1 || "",
-          ship_street2: shipping.street2 || "",
-          ship_city: shipping.city || "",
-          ship_state: shipping.state || "",
-          ship_zip: shipping.zip || "",
-          ship_country: shipping.country || "",
           artist: (item.artist || "").slice(0, 120),
           venue: (item.venue || "").slice(0, 120),
           datetime: (item.datetime || "").slice(0, 120),
@@ -841,7 +849,10 @@ const server = http.createServer(async (req, res) => {
       if (!stripe || !id || !/^cs_[A-Za-z0-9_]+$/.test(id)) {
         return sendJson(res, 200, { paid: false });
       }
-      const session = await stripe.checkout.sessions.retrieve(id);
+      const session = await stripe.checkout.sessions.retrieve(id, {
+        expand: ["customer_details"],
+      });
+      const ship = getShippingFromSession(session);
       const items = cartFromMetadata(session.metadata);
       return sendJson(res, 200, {
         paid: session.payment_status === "paid",
@@ -849,6 +860,7 @@ const server = http.createServer(async (req, res) => {
         email: session.customer_details?.email || session.customer_email || "",
         product: session.metadata?.product || "",
         cart: items,
+        shippingAddress: formatShippingDisplay(ship),
         amountTotal: session.amount_total,
       });
     } catch (e) {

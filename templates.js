@@ -167,6 +167,21 @@ function alphaCode(seed, len) {
   return out;
 }
 
+/** Deterministic numeric barcode from a seed (for when OCR/vision find no digits). */
+function numericBarcode(seed, len) {
+  const fromDigits = digits(seed, len);
+  if (fromDigits) return fromDigits;
+  const s = String(seed || "TICKET");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += String((h + i * 7) % 10);
+    h = (h * 17 + 13) >>> 0;
+  }
+  return out;
+}
+
 function digits(s, n) {
   const d = String(s || "").replace(/\D/g, "");
   if (!d) return "";
@@ -261,7 +276,7 @@ export function prepareTicketData(raw) {
     disclaimer,
     datetime,
     dateShort: pick(f.dateShort, shortDate(datetime)),
-    barcode: barcodeRaw || digits(alphaCode(seed, 13), 13),
+    barcode: barcodeRaw || numericBarcode(seed, 13),
   };
 }
 

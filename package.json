@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
-    "test:fulfillment": "node scripts/test-fulfillment.mjs"
+    "test:fulfillment": "node scripts/test-fulfillment.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs"
   },
   "description": "Real Ticket Stubs — screenshot to print-ready Ticketmaster thermal stub",
   "engines": {

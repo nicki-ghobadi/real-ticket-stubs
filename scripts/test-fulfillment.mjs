@@ -10,22 +10,13 @@
  * Requires RESEND_API_KEY + ORDER_FROM_EMAIL for email test.
  * Loads .env from the project root automatically.
  */
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import "../load-env.mjs";
 import {
   saveOrder,
   sendOrderConfirmation,
   persistenceEnabled,
   emailEnabled,
 } from "../fulfillment.mjs";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ENV_PATH = path.join(__dirname, "..", ".env");
-
-if (fs.existsSync(ENV_PATH) && typeof process.loadEnvFile === "function") {
-  process.loadEnvFile(ENV_PATH);
-}
 
 const args = process.argv.slice(2);
 const emailFlag = args.find((a) => a.startsWith("--email="));

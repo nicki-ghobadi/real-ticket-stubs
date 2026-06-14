@@ -8,7 +8,6 @@ import {
   prepareTicketData,
   buildTicketHtml,
 } from "./templates.js";
-import { validateShippingFormat } from "./shipping-validation.js";
 
 const $ = (sel) => document.querySelector(sel);
 const form = $("#ticket-form");
@@ -63,16 +62,20 @@ function renderStub(fields) {
   stage.innerHTML = buildTicketHtml(d);
 
   const svg = stage.querySelector(".tm-barcode");
-  if (svg && window.JsBarcode) {
-    JsBarcode(svg, d.barcode, {
-      format: "CODE128",
-      width: 1.8,
-      height: 48,
-      displayValue: false,
-      margin: 0,
-      background: "transparent",
-      lineColor: "#000000",
-    });
+  if (svg && window.JsBarcode && d.barcode) {
+    try {
+      JsBarcode(svg, d.barcode, {
+        format: "CODE128",
+        width: 1.8,
+        height: 48,
+        displayValue: false,
+        margin: 0,
+        background: "transparent",
+        lineColor: "#000000",
+      });
+    } catch (e) {
+      console.warn("JsBarcode skipped:", e?.message || e);
+    }
   }
 }
 
@@ -589,13 +592,28 @@ async function extract() {
       runOcr(state.imageDataUrl),
     ]);
     const visionFields = visionRes.status === "fulfilled" ? visionRes.value : {};
-    const ocrFields =
-      ocrText.status === "fulfilled" ? parseOcrText(ocrText.value) : {};
+    let ocrFields = {};
+    if (ocrText.status === "fulfilled") {
+      try {
+        ocrFields = parseOcrText(ocrText.value);
+      } catch (e) {
+        console.warn("OCR parse failed:", e);
+      }
+    }
     const merged = mergeFields(visionFields, ocrFields);
     const fields = normalizeExtractedFields(merged);
 
     if (visionRes.status === "rejected") {
       console.warn("Server extract unavailable:", visionRes.reason);
+    }
+    if (ocrText.status === "rejected") {
+      console.warn("Browser OCR unavailable:", ocrText.reason);
+    }
+
+    const hasExtractedData = Object.values(fields).some((v) => String(v || "").trim());
+    if (!hasExtractedData && visionRes.status === "rejected" && ocrText.status === "rejected") {
+      const reason = visionRes.reason?.message || ocrText.reason?.message || "Extraction failed.";
+      throw new Error(reason);
     }
 
     state.fields = { ...blankFields(), ...fields };
@@ -702,7 +720,7 @@ const money = (n) => `$${Number(n).toFixed(2)}`;
 
 /** @type {{ product: string, quantity: number }[]} */
 const cart = [];
-const order = { shipping: null, confirmation: null };
+const order = { confirmation: null };
 
 function clampQty(n) {
   return Math.min(MAX_CART_QTY, Math.max(1, Math.floor(Number(n) || 1)));
@@ -834,85 +852,11 @@ function showStep(name) {
   });
 }
 
-function markInvalid(form) {
-  let firstBad = null;
-  for (const input of form.querySelectorAll("input[required], select[required]")) {
-    const empty = !input.value.trim();
-    input.setAttribute("aria-invalid", empty ? "true" : "false");
-    if (empty && !firstBad) firstBad = input;
-  }
-  if (firstBad) firstBad.focus();
-  return !firstBad;
-}
-
-function clearAddressFieldErrors(form) {
-  const banner = $("#address-form-banner");
-  if (banner) {
-    banner.textContent = "";
-    banner.classList.add("hidden");
-  }
-  for (const el of form.querySelectorAll(".field-error")) {
-    el.textContent = "";
-    el.hidden = true;
-  }
-  for (const input of form.querySelectorAll("input, select")) {
-    input.removeAttribute("aria-invalid");
-  }
-}
-
-function showAddressFieldErrors(form, errors) {
-  clearAddressFieldErrors(form);
-  const banner = $("#address-form-banner");
-  let firstInput = null;
-
-  for (const [field, message] of Object.entries(errors || {})) {
-    if (field === "_form") {
-      if (banner) {
-        banner.textContent = message;
-        banner.classList.remove("hidden");
-      }
-      continue;
-    }
-    const errEl = form.querySelector(`[data-error-for="${field}"]`);
-    const input = form.elements.namedItem(field);
-    if (errEl) {
-      errEl.textContent = message;
-      errEl.hidden = false;
-    }
-    if (input) {
-      input.setAttribute("aria-invalid", "true");
-      if (!firstInput) firstInput = input;
-    }
-  }
-  if (firstInput) firstInput.focus();
-  else if (banner && !banner.classList.contains("hidden")) banner.focus?.();
-}
-
-async function validateShippingWithServer(data) {
-  const res = await fetch(api("/api/validate-shipping"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(json.errors?._form || json.error || "Address verification failed.");
-  }
-  return json;
-}
-
-function readFormData(form) {
-  const data = {};
-  for (const [k, v] of new FormData(form).entries()) data[k] = String(v).trim();
-  return data;
-}
-
 /** Create a Stripe Checkout Session for the cart and return either
  *  { url } (redirect to Stripe) or { mock, confirmation } (demo fallback). */
 async function createCheckoutSession() {
   const payload = {
     cart: cart.map((item) => ({ product: item.product, quantity: item.quantity })),
-    shipping: order.shipping,
     item: {
       artist: state.fields.eventLine2 || "",
       venue: state.fields.venue || "",
@@ -926,15 +870,57 @@ async function createCheckoutSession() {
     body: JSON.stringify(payload),
   });
   const json = await res.json().catch(() => ({}));
-  if (res.status === 400 && json.errors) {
-    const err = new Error(json.error || "Shipping address could not be verified.");
-    err.errors = json.errors;
-    throw err;
-  }
   if (!res.ok) {
     throw new Error(json.error || `Checkout failed (${res.status})`);
   }
   return json;
+}
+
+/** Cart → Stripe Checkout (address + payment collected on Stripe's page). */
+async function startCheckout() {
+  const btn = $("#cart-checkout-btn");
+  const errEl = $("#cart-checkout-error");
+  if (!cart.length) {
+    setStatus("Add at least one item to your cart.", "warn");
+    return;
+  }
+  if (errEl) {
+    errEl.textContent = "";
+    errEl.classList.add("hidden");
+  }
+  const prevLabel = btn?.textContent || "Checkout with Stripe";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Redirecting to Stripe…";
+  }
+  try {
+    const result = await createCheckoutSession();
+    if (result.url) {
+      goToStripe(result.url);
+      return;
+    }
+    // Demo fallback (no STRIPE_SECRET_KEY on the server).
+    order.confirmation = result.confirmation;
+    showSuccess({
+      confirmation: result.confirmation,
+      charged: money(cartGrandTotal()),
+    });
+    cart.length = 0;
+    renderCart();
+  } catch (err) {
+    const msg = err?.message || "Could not start checkout. Try again.";
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.classList.remove("hidden");
+    } else {
+      setStatus(msg, "err");
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevLabel;
+    }
+  }
 }
 
 function initOrderModal() {
@@ -999,143 +985,14 @@ function initOrderModal() {
     setCartQty(input.dataset.product, readQtyInput(input));
   });
 
-  $("#cart-checkout-btn")?.addEventListener("click", () => {
-    if (!cart.length) {
-      setStatus("Add at least one item to your cart.", "warn");
-      return;
-    }
-    updatePaySummary();
-    showStep("address");
-  });
-
-  // Back buttons on address + pay.
-  modal.querySelectorAll("[data-back]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const step = btn.closest(".modal-step")?.dataset.step;
-      if (step === "address") showStep("choose");
-      else if (step === "pay") showStep("address");
-    });
-  });
-
-  // Step 2 — shipping address (format check, then server: email MX + postal API).
-  $("#address-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    clearAddressFieldErrors(form);
-    if (!markInvalid(form)) return;
-
-    const data = readFormData(form);
-    const format = validateShippingFormat(data);
-    if (!format.valid) {
-      showAddressFieldErrors(form, format.errors);
-      return;
-    }
-
-    const btn = $("#address-continue-btn");
-    const prevLabel = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = "Verifying address…";
-    try {
-      const result = await validateShippingWithServer(data);
-      if (!result.valid) {
-        showAddressFieldErrors(form, result.errors);
-        return;
-      }
-      order.shipping = result.normalized;
-      updatePaySummary();
-      showStep("pay");
-    } catch (err) {
-      showAddressFieldErrors(form, {
-        _form: err.message || "Could not verify address. Try again.",
-      });
-    } finally {
-      btn.disabled = false;
-      btn.textContent = prevLabel;
-    }
-  });
-
-  // Clear field errors as the user edits the address form.
-  $("#address-form")?.addEventListener("input", (e) => {
-    const form = e.target.closest("#address-form");
-    if (!form) return;
-    const name = e.target.name;
-    if (!name) return;
-    const errEl = form.querySelector(`[data-error-for="${name}"]`);
-    if (errEl) {
-      errEl.textContent = "";
-      errEl.hidden = true;
-    }
-    e.target.removeAttribute("aria-invalid");
-  });
-
-  // Step 3 — payment via Stripe-hosted Checkout.
-  $("#pay-btn").addEventListener("click", async () => {
-    const payBtn = $("#pay-btn");
-    const payErr = $("#pay-error");
-    payErr.textContent = "";
-    payErr.classList.add("hidden");
-    payBtn.disabled = true;
-    payBtn.textContent = "Starting secure checkout…";
-    try {
-      const result = await createCheckoutSession();
-      if (result.url) {
-        // Hand off to Stripe's hosted payment page (breaks out of an iframe).
-        goToStripe(result.url);
-        return;
-      }
-      // Demo fallback (no STRIPE_SECRET_KEY configured on the server).
-      order.confirmation = result.confirmation;
-      showSuccess({
-        confirmation: result.confirmation,
-        email: order.shipping?.email,
-        charged: money(cartGrandTotal()),
-      });
-      cart.length = 0;
-      renderCart();
-    } catch (err) {
-      if (err?.errors) {
-        showStep("address");
-        showAddressFieldErrors($("#address-form"), err.errors);
-      } else {
-        payErr.textContent = err?.message || "Could not start checkout. Try again.";
-        payErr.classList.remove("hidden");
-      }
-    } finally {
-      payBtn.disabled = false;
-      updatePaySummary();
-    }
-  });
-}
-
-/** Render the payment-step summary from the current cart. */
-function updatePaySummary() {
-  const box = $("#pay-summary");
-  const payBtn = $("#pay-btn");
-  if (!box) return;
-
-  const lines = cart
-    .map((item) => {
-      const p = PRODUCTS[item.product];
-      if (!p) return "";
-      return `<div class="row"><span>${cartItemLabel(item)}</span><span>${money(cartLineTotal(item))}</span></div>`;
-    })
-    .join("");
-
-  const total = money(cartGrandTotal());
-  box.innerHTML = `${lines}<div class="row total"><span>Total</span><span>${total}</span></div>`;
-  if (payBtn) payBtn.textContent = cart.length ? `Pay ${total} with Stripe` : "Pay with Stripe";
+  $("#cart-checkout-btn")?.addEventListener("click", () => startCheckout());
 }
 
 /** Render the success step (used by both Stripe return + demo fallback). */
-function showSuccess({ confirmation, email, charged }) {
+function showSuccess({ confirmation, email, charged, address }) {
   $("#success-confirm").textContent = confirmation || "—";
-  $("#success-email").textContent = email || order.shipping?.email || "your email";
-  const s = order.shipping || {};
-  const addr =
-    `${s.name || ""}, ${s.street1 || ""}${s.street2 ? ", " + s.street2 : ""}, ${s.city || ""} ${s.state || ""} ${s.zip || ""}`
-      .replace(/\s+/g, " ")
-      .trim();
-  $("#success-address").textContent = addr.replace(/^,\s*/, "") || "—";
+  $("#success-email").textContent = email || "your email";
+  $("#success-address").textContent = address || "—";
   const chargedEl = $("#success-charged");
   if (chargedEl) {
     chargedEl.textContent = charged || (cart.length ? money(cartGrandTotal()) : "—");
@@ -1173,6 +1030,7 @@ async function handleCheckoutReturn() {
   showSuccess({
     confirmation: info.confirmation || "PAID",
     email: info.email,
+    address: info.shippingAddress || "",
     charged: typeof info.amountTotal === "number" ? money(info.amountTotal / 100) : undefined,
   });
   cart.length = 0;
