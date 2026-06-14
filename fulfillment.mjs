@@ -20,6 +20,16 @@ const BUSINESS_NAME = process.env.BUSINESS_NAME || "Real Ticket Stubs";
 export const persistenceEnabled = !!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 export const emailEnabled = !!(RESEND_API_KEY && ORDER_FROM_EMAIL);
 
+/** Only allow HTTPS Supabase project URLs (blocks SSRF via a malicious env value). */
+function isAllowedSupabaseUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && /\.supabase\.co$/i.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Format an integer amount of cents as a currency string, e.g. 2999 → $29.99 */
 export function formatMoney(cents, currency = "usd") {
   const n = Number(cents || 0) / 100;
@@ -72,6 +82,10 @@ export async function saveOrder(order) {
     // Treat as "created" so a confirmation email still goes out in setups that
     // have email configured but not a database yet.
     return { persisted: false, created: true };
+  }
+
+  if (!isAllowedSupabaseUrl(SUPABASE_URL)) {
+    return { persisted: false, created: false, error: "Invalid SUPABASE_URL." };
   }
 
   const row = {

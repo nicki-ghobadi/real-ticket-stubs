@@ -707,9 +707,11 @@ const server = http.createServer(async (req, res) => {
       const shipping = verified.normalized;
       const item = payload?.item || {};
 
-      // Demo fallback: if no Stripe key is configured, mock a confirmation so the
-      // app still works end-to-end out of the box. Real payments require a key.
+      // Demo fallback for local dev only. Never mock payments in production.
       if (!stripe) {
+        if (IS_PROD) {
+          return sendJson(res, 503, { error: "Payments are not configured." });
+        }
         const confirmation = "RTS-" + Math.random().toString(36).slice(2, 8).toUpperCase();
         console.log("⚠️  STRIPE_SECRET_KEY not set — mocking order:", {
           confirmation,
