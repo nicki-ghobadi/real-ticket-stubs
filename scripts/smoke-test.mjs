@@ -6,8 +6,8 @@
  *   node scripts/smoke-test.mjs --base http://localhost:3456
  */
 import "../load-env.mjs";
-import { normalizeExtractedFields, prepareTicketData } from "../templates.js";
-import { validateShippingFormat } from "../shipping-validation.js";
+import { normalizeExtractedFields, prepareTicketData } from "../public/templates.js";
+import { validateShippingFormat } from "../public/shipping-validation.js";
 
 const base = (process.argv.find((a) => a.startsWith("--base="))?.split("=")[1]
   || "http://localhost:3456").replace(/\/$/, "");

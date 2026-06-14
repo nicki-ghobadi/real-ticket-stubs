@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Stripe from "stripe";
 import { validateShippingComplete, validateAddressWithGoogle } from "./shipping-verify-server.mjs";
-import { normalizeExtractedFields } from "./templates.js";
+import { normalizeExtractedFields } from "./public/templates.js";
 import {
   saveOrder,
   sendOrderConfirmation,
@@ -919,7 +919,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" || req.method === "HEAD") {
     const file = PUBLIC_FILES.get(pathname);
     if (!file) return send(res, 404, "Not found");
-    const filePath = path.join(__dirname, file);
+    const filePath = path.join(__dirname, "public", file);
     return fs.stat(filePath, (statErr, stat) => {
       if (statErr || !stat.isFile()) return send(res, 404, "Not found");
       const ext = path.extname(filePath);

@@ -6,7 +6,7 @@ import dns from "node:dns/promises";
 import {
   validateShippingFormat,
   verifyPostalWithZippopotam,
-} from "./shipping-validation.js";
+} from "./public/shipping-validation.js";
 
 // TODO(production): Google Address Validation API — set GOOGLE_ADDRESS_VALIDATION_API_KEY;
 //   call https://addressvalidation.googleapis.com/v1:validateAddress for deliverability.
