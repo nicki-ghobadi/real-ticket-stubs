@@ -676,46 +676,125 @@ function initActions() {
   });
 }
 
-// ───────────────────────── Order modal ─────────────────────────
-// Multi-step flow triggered by the "Print stub" button:
-//   choose  → print at home (free)  or  mail a stub ($3.99)  or  framed ($29.99)
-//   address → shipping form, validated client + server
-//   pay     → redirect to Stripe-hosted Checkout
-//   success → confirmation # + masked address
-// TODO(production): Address autocomplete on street1 (Google Places / Mapbox).
+// ───────────────────────── Order modal + cart ─────────────────────────
+// Multi-step flow: shop/cart → address → Stripe Checkout → success.
+// Cart supports multiple products and quantities; checkout uses API Sessions
+// (not Payment Links — those only support one product at a time).
+
+const MAX_CART_QTY = 99;
 
 // Product catalog — keep in sync with PRODUCTS in server.mjs.
 const PRODUCTS = {
-  mail: { label: "Printed stub mailed (1x)", price: 3.99 },
-  framed: { label: "Framed stub for the wall (1x)", price: 29.99 },
+  mail: {
+    label: "Printed stub — mailed",
+    shortLabel: "Mailed stub",
+    price: 3.99,
+    amount: 399,
+  },
+  framed: {
+    label: "Framed stub for the wall",
+    shortLabel: "Framed stub",
+    price: 29.99,
+    amount: 2999,
+  },
 };
 const money = (n) => `$${Number(n).toFixed(2)}`;
-const order = { product: null, shipping: null, confirmation: null };
 
-// Stripe Payment Links — loaded from the server (/api/config), which reads
-// STRIPE_PAYMENT_LINK_MAIL and STRIPE_PAYMENT_LINK_FRAMED from .env.
-// Never hardcode link URLs here; they would be committed to git.
-let paymentLinks = { mail: "", framed: "" };
-const isStripeLink = (u) => {
-  if (typeof u !== "string") return false;
-  try {
-    const { protocol, hostname } = new URL(u);
-    return protocol === "https:" && /(^|\.)stripe\.com$/i.test(hostname);
-  } catch {
-    return false;
+/** @type {{ product: string, quantity: number }[]} */
+const cart = [];
+const order = { shipping: null, confirmation: null };
+
+function clampQty(n) {
+  return Math.min(MAX_CART_QTY, Math.max(1, Math.floor(Number(n) || 1)));
+}
+
+function readQtyInput(input) {
+  return clampQty(input?.value);
+}
+
+function cartLineTotal(item) {
+  const p = PRODUCTS[item.product];
+  return p ? p.price * item.quantity : 0;
+}
+
+function cartGrandTotal() {
+  return cart.reduce((sum, item) => sum + cartLineTotal(item), 0);
+}
+
+function cartItemLabel(item) {
+  const p = PRODUCTS[item.product];
+  if (!p) return item.product;
+  return `${p.shortLabel} × ${item.quantity}`;
+}
+
+function findCartIndex(productKey) {
+  return cart.findIndex((item) => item.product === productKey);
+}
+
+function addToCart(productKey, quantity) {
+  if (!PRODUCTS[productKey]) return;
+  const qty = clampQty(quantity);
+  const idx = findCartIndex(productKey);
+  if (idx >= 0) cart[idx].quantity = clampQty(cart[idx].quantity + qty);
+  else cart.push({ product: productKey, quantity: qty });
+  renderCart();
+}
+
+function setCartQty(productKey, quantity) {
+  const idx = findCartIndex(productKey);
+  if (idx < 0) return;
+  const qty = clampQty(quantity);
+  cart[idx].quantity = qty;
+  renderCart();
+}
+
+function removeFromCart(productKey) {
+  const idx = findCartIndex(productKey);
+  if (idx >= 0) cart.splice(idx, 1);
+  renderCart();
+}
+
+function renderCart() {
+  const panel = $("#cart-panel");
+  const list = $("#cart-lines");
+  const totalEl = $("#cart-total");
+  if (!panel || !list) return;
+
+  if (!cart.length) {
+    panel.classList.add("hidden");
+    list.innerHTML = "";
+    if (totalEl) totalEl.textContent = money(0);
+    return;
   }
-};
+
+  panel.classList.remove("hidden");
+  list.innerHTML = cart
+    .map((item) => {
+      const p = PRODUCTS[item.product];
+      if (!p) return "";
+      return `<li class="cart-line" data-product="${item.product}">
+        <span class="cart-line-label">${p.shortLabel}</span>
+        <span class="cart-line-price">${money(cartLineTotal(item))}</span>
+        <button type="button" class="cart-line-remove" data-remove-cart="${item.product}">Remove</button>
+        <div class="qty-control" aria-label="Quantity for ${p.shortLabel}">
+          <button type="button" class="qty-btn" data-cart-qty-delta="-1" data-product="${item.product}" aria-label="Decrease">−</button>
+          <input type="number" class="qty-input cart-qty-input" data-product="${item.product}" value="${item.quantity}" min="1" max="${MAX_CART_QTY}" inputmode="numeric" aria-label="Quantity" />
+          <button type="button" class="qty-btn" data-cart-qty-delta="1" data-product="${item.product}" aria-label="Increase">+</button>
+        </div>
+      </li>`;
+    })
+    .join("");
+
+  if (totalEl) totalEl.textContent = money(cartGrandTotal());
+}
 
 async function loadAppConfig() {
   try {
     const res = await fetch(api("/api/config"));
     if (!res.ok) return;
-    const cfg = await res.json().catch(() => ({}));
-    if (cfg.paymentLinks && typeof cfg.paymentLinks === "object") {
-      paymentLinks = { ...paymentLinks, ...cfg.paymentLinks };
-    }
+    await res.json().catch(() => ({}));
   } catch (e) {
-    console.warn("Could not load payment link config:", e);
+    console.warn("Could not load app config:", e);
   }
 }
 
@@ -737,6 +816,7 @@ function openOrderModal() {
   const modal = $("#order-modal");
   modal.classList.add("open");
   modal.setAttribute("aria-hidden", "false");
+  renderCart();
   showStep("choose");
   document.body.style.overflow = "hidden";
 }
@@ -827,12 +907,11 @@ function readFormData(form) {
   return data;
 }
 
-/** Create a Stripe Checkout Session for the chosen product and return either
- *  { url } (redirect to Stripe) or { mock, confirmation } (demo fallback when
- *  the server has no STRIPE_SECRET_KEY configured). */
+/** Create a Stripe Checkout Session for the cart and return either
+ *  { url } (redirect to Stripe) or { mock, confirmation } (demo fallback). */
 async function createCheckoutSession() {
   const payload = {
-    product: order.product,
+    cart: cart.map((item) => ({ product: item.product, quantity: item.quantity })),
     shipping: order.shipping,
     item: {
       artist: state.fields.eventLine2 || "",
@@ -870,31 +949,63 @@ function initOrderModal() {
     if (e.key === "Escape" && modal.classList.contains("open")) closeOrderModal();
   });
 
-  // Step 1 — choice.
-  modal.querySelector('.choice[data-action="print"]').addEventListener("click", () => {
+  // Step 1 — print at home or build cart.
+  modal.querySelector('.choice[data-action="print"]')?.addEventListener("click", () => {
     closeOrderModal();
     setTimeout(() => window.print(), 60);
   });
-  modal.querySelectorAll('.choice[data-action="order"]').forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const productKey = btn.dataset.product;
-      if (!PRODUCTS[productKey]) return;
-      order.product = productKey;
 
-      // If a Stripe Payment Link is configured for this product, hand off to it.
-      // Stripe collects the shipping address, email, and payment, then redirects
-      // back to the URL configured on the link.
-      const link = paymentLinks[productKey];
-      if (isStripeLink(link)) {
-        closeOrderModal();
-        goToStripe(link);
-        return;
-      }
+  modal.querySelectorAll(".shop-product").forEach((row) => {
+    const productKey = row.dataset.product;
+    const qtyInput = row.querySelector(".qty-input");
+    if (!PRODUCTS[productKey] || !qtyInput) return;
 
-      // Otherwise fall back to in-app address verification + API Checkout.
-      updatePaySummary();
-      showStep("address");
+    row.querySelectorAll("[data-qty-delta]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const delta = Number(btn.dataset.qtyDelta);
+        qtyInput.value = String(clampQty(readQtyInput(qtyInput) + delta));
+      });
     });
+
+    qtyInput.addEventListener("change", () => {
+      qtyInput.value = String(readQtyInput(qtyInput));
+    });
+
+    row.querySelector(".btn-add-cart")?.addEventListener("click", () => {
+      addToCart(productKey, readQtyInput(qtyInput));
+      qtyInput.value = "1";
+    });
+  });
+
+  $("#cart-lines")?.addEventListener("click", (e) => {
+    const removeKey = e.target.closest("[data-remove-cart]")?.dataset.removeCart;
+    if (removeKey) {
+      removeFromCart(removeKey);
+      return;
+    }
+    const deltaBtn = e.target.closest("[data-cart-qty-delta]");
+    if (deltaBtn) {
+      const productKey = deltaBtn.dataset.product;
+      const idx = findCartIndex(productKey);
+      if (idx < 0) return;
+      const delta = Number(deltaBtn.dataset.cartQtyDelta);
+      setCartQty(productKey, cart[idx].quantity + delta);
+    }
+  });
+
+  $("#cart-lines")?.addEventListener("change", (e) => {
+    const input = e.target.closest(".cart-qty-input");
+    if (!input) return;
+    setCartQty(input.dataset.product, readQtyInput(input));
+  });
+
+  $("#cart-checkout-btn")?.addEventListener("click", () => {
+    if (!cart.length) {
+      setStatus("Add at least one item to your cart.", "warn");
+      return;
+    }
+    updatePaySummary();
+    showStep("address");
   });
 
   // Back buttons on address + pay.
@@ -931,6 +1042,7 @@ function initOrderModal() {
         return;
       }
       order.shipping = result.normalized;
+      updatePaySummary();
       showStep("pay");
     } catch (err) {
       showAddressFieldErrors(form, {
@@ -976,7 +1088,10 @@ function initOrderModal() {
       showSuccess({
         confirmation: result.confirmation,
         email: order.shipping?.email,
+        charged: money(cartGrandTotal()),
       });
+      cart.length = 0;
+      renderCart();
     } catch (err) {
       if (err?.errors) {
         showStep("address");
@@ -987,24 +1102,28 @@ function initOrderModal() {
       }
     } finally {
       payBtn.disabled = false;
-      payBtn.textContent = "Pay with Stripe";
+      updatePaySummary();
     }
   });
 }
 
-/** Update the order summary shown on the payment step from the chosen product. */
+/** Render the payment-step summary from the current cart. */
 function updatePaySummary() {
-  const p = PRODUCTS[order.product];
-  if (!p) return;
-  const price = money(p.price);
-  const label = $("#pay-summary-label");
-  const sPrice = $("#pay-summary-price");
-  const total = $("#pay-summary-total");
+  const box = $("#pay-summary");
   const payBtn = $("#pay-btn");
-  if (label) label.textContent = p.label;
-  if (sPrice) sPrice.textContent = price;
-  if (total) total.textContent = price;
-  if (payBtn) payBtn.textContent = "Pay with Stripe";
+  if (!box) return;
+
+  const lines = cart
+    .map((item) => {
+      const p = PRODUCTS[item.product];
+      if (!p) return "";
+      return `<div class="row"><span>${cartItemLabel(item)}</span><span>${money(cartLineTotal(item))}</span></div>`;
+    })
+    .join("");
+
+  const total = money(cartGrandTotal());
+  box.innerHTML = `${lines}<div class="row total"><span>Total</span><span>${total}</span></div>`;
+  if (payBtn) payBtn.textContent = cart.length ? `Pay ${total} with Stripe` : "Pay with Stripe";
 }
 
 /** Render the success step (used by both Stripe return + demo fallback). */
@@ -1019,8 +1138,7 @@ function showSuccess({ confirmation, email, charged }) {
   $("#success-address").textContent = addr.replace(/^,\s*/, "") || "—";
   const chargedEl = $("#success-charged");
   if (chargedEl) {
-    const fallback = order.product ? money(PRODUCTS[order.product].price) : "—";
-    chargedEl.textContent = charged || fallback;
+    chargedEl.textContent = charged || (cart.length ? money(cartGrandTotal()) : "—");
   }
   const modal = $("#order-modal");
   if (!modal.classList.contains("open")) openOrderModal();
@@ -1052,12 +1170,13 @@ async function handleCheckoutReturn() {
       /* best-effort */
     }
   }
-  if (info.product && PRODUCTS[info.product]) order.product = info.product;
   showSuccess({
     confirmation: info.confirmation || "PAID",
     email: info.email,
     charged: typeof info.amountTotal === "number" ? money(info.amountTotal / 100) : undefined,
   });
+  cart.length = 0;
+  renderCart();
 }
 
 (async () => {

@@ -93,6 +93,7 @@ export async function saveOrder(order) {
     email: order.email || "",
     product_key: order.productKey || "",
     product_name: order.productName || "",
+    cart_json: order.cartJson || (order.cartItems?.length ? JSON.stringify(order.cartItems) : ""),
     amount_total: order.amountTotal ?? null,
     currency: order.currency || "usd",
     ship_name: order.shipping?.name || "",
@@ -139,16 +140,41 @@ function buildEmail(order) {
   const code = confirmationCode(order.sessionId);
   const amount = formatMoney(order.amountTotal, order.currency);
   const addr = oneLineAddress(order.shipping);
-  const product = order.productName || "Ticket stub";
   const support = SUPPORT_EMAIL ? `<a href="mailto:${esc(SUPPORT_EMAIL)}">${esc(SUPPORT_EMAIL)}</a>` : "us";
   const supportText = SUPPORT_EMAIL || "support";
+
+  const PRODUCT_LABELS = {
+    mail: "Printed stub — mailed",
+    framed: "Framed stub for the wall",
+  };
+  const PRODUCT_CENTS = { mail: 399, framed: 2999 };
+
+  const cartLines = (order.cartItems || [])
+    .filter((row) => row?.product && PRODUCT_LABELS[row.product])
+    .map((row) => ({
+      label: `${PRODUCT_LABELS[row.product]} × ${row.quantity}`,
+      price: formatMoney((PRODUCT_CENTS[row.product] || 0) * row.quantity, order.currency),
+    }));
+
+  const itemRows = cartLines.length
+    ? cartLines
+        .map(
+          (line) =>
+            `<tr><td style="padding:6px 0;color:#777">${esc(line.label)}</td><td style="padding:6px 0;text-align:right">${esc(line.price)}</td></tr>`,
+        )
+        .join("")
+    : `<tr><td style="padding:6px 0;color:#777">Item</td><td style="padding:6px 0;text-align:right">${esc(order.productName || "Ticket stub")}</td></tr>`;
+
+  const textLines = cartLines.length
+    ? cartLines.map((line) => `${line.label}: ${line.price}`)
+    : [`Item: ${order.productName || "Ticket stub"}`];
 
   const html = `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111;line-height:1.5;max-width:560px;margin:0 auto;padding:24px">
     <h1 style="font-size:20px;margin:0 0 4px">Thanks for your order!</h1>
     <p style="margin:0 0 16px;color:#555">${esc(BUSINESS_NAME)} received your payment and your printed stub is being prepared.</p>
     <table style="width:100%;border-collapse:collapse;font-size:14px">
       <tr><td style="padding:6px 0;color:#777">Confirmation #</td><td style="padding:6px 0;text-align:right;font-weight:600">${esc(code)}</td></tr>
-      <tr><td style="padding:6px 0;color:#777">Item</td><td style="padding:6px 0;text-align:right">${esc(product)}</td></tr>
+      ${itemRows}
       <tr><td style="padding:6px 0;color:#777">Amount paid</td><td style="padding:6px 0;text-align:right;font-weight:600">${esc(amount)}</td></tr>
       ${addr ? `<tr><td style="padding:6px 0;color:#777">Shipping to</td><td style="padding:6px 0;text-align:right">${esc(addr)}</td></tr>` : ""}
     </table>
@@ -161,7 +187,7 @@ function buildEmail(order) {
     `${BUSINESS_NAME} received your payment and your printed stub is being prepared.`,
     ``,
     `Confirmation #: ${code}`,
-    `Item: ${product}`,
+    ...textLines,
     `Amount paid: ${amount}`,
     addr ? `Shipping to: ${addr}` : "",
     ``,

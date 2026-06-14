@@ -135,15 +135,96 @@ const PRODUCTS = {
   },
 };
 
-/** Identify which product was bought. API Checkout sets metadata.product;
- *  Payment Links don't, so fall back to matching the charged amount. */
+const MAX_CART_QTY = 99;
+
+/** Normalize cart payload (multi-item) or legacy single `product` field. */
+function parseCartPayload(payload) {
+  let raw = [];
+  if (Array.isArray(payload?.cart) && payload.cart.length) {
+    raw = payload.cart;
+  } else if (payload?.product && PRODUCTS[payload.product]) {
+    raw = [{ product: payload.product, quantity: 1 }];
+  } else {
+    return { error: "Your cart is empty." };
+  }
+
+  const merged = new Map();
+  for (const row of raw) {
+    const key = String(row?.product || "");
+    if (!PRODUCTS[key]) return { error: "Unknown product in cart." };
+    const qty = Math.min(MAX_CART_QTY, Math.max(1, Math.floor(Number(row?.quantity) || 0)));
+    merged.set(key, (merged.get(key) || 0) + qty);
+  }
+
+  const items = [...merged.entries()].map(([product, quantity]) => ({ product, quantity }));
+  if (!items.length) return { error: "Your cart is empty." };
+
+  const lineItems = items.map(({ product, quantity }) => ({
+    quantity,
+    price_data: {
+      currency: "usd",
+      unit_amount: PRODUCTS[product].amount,
+      product_data: {
+        name: PRODUCTS[product].name,
+        description: PRODUCTS[product].description,
+      },
+    },
+  }));
+
+  const cartJson = JSON.stringify(items);
+  const productSummary = items.map(({ product, quantity }) => `${product}:${quantity}`).join(",");
+  const productName = items
+    .map(({ product, quantity }) => `${PRODUCTS[product].name} × ${quantity}`)
+    .join(", ");
+
+  return { items, lineItems, cartJson, productSummary, productName };
+}
+
+/** Parse cart from Stripe session metadata (webhook / success page). */
+function cartFromMetadata(metadata) {
+  if (!metadata) return [];
+  if (metadata.cart_json) {
+    try {
+      const parsed = JSON.parse(metadata.cart_json);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      /* fall through */
+    }
+  }
+  if (metadata.cart) {
+    return String(metadata.cart)
+      .split(",")
+      .map((part) => {
+        const [product, qty] = part.split(":");
+        return { product, quantity: Number(qty) || 1 };
+      })
+      .filter((row) => row.product && PRODUCTS[row.product]);
+  }
+  if (metadata.product && PRODUCTS[metadata.product]) {
+    return [{ product: metadata.product, quantity: 1 }];
+  }
+  return [];
+}
+
+/** Identify which product(s) were bought from session metadata or amount. */
 function productFromSession(session) {
+  const items = cartFromMetadata(session?.metadata);
+  if (items.length) {
+    const productName = items
+      .map(({ product, quantity }) => `${PRODUCTS[product]?.name || product} × ${quantity}`)
+      .join(", ");
+    return {
+      key: items.length === 1 ? items[0].product : "cart",
+      name: productName || "Ticket stub order",
+      items,
+    };
+  }
   const key = session?.metadata?.product;
-  if (key && PRODUCTS[key]) return { key, name: PRODUCTS[key].name };
+  if (key && PRODUCTS[key]) return { key, name: PRODUCTS[key].name, items: [{ product: key, quantity: 1 }] };
   const amount = session?.amount_total;
   const match = Object.entries(PRODUCTS).find(([, p]) => p.amount === amount);
-  if (match) return { key: match[0], name: match[1].name };
-  return { key: "", name: "Ticket stub" };
+  if (match) return { key: match[0], name: match[1].name, items: [{ product: match[0], quantity: 1 }] };
+  return { key: "", name: "Ticket stub", items: [] };
 }
 
 /** Best-effort public origin for Stripe success/cancel redirects. */
@@ -556,6 +637,8 @@ async function handleCheckoutCompleted(sessionObj) {
       email,
       productKey: product.key,
       productName: product.name,
+      cartJson: session?.metadata?.cart_json || session?.metadata?.cart || "",
+      cartItems: product.items,
       amountTotal: session?.amount_total ?? null,
       currency: session?.currency || "usd",
       shipping: ship,
@@ -689,8 +772,8 @@ const server = http.createServer(async (req, res) => {
     if (!enforceRateLimit(req, res, "checkout", 15, 10 * 60_000)) return;
     try {
       const payload = await readJson(req, MAX_JSON_BODY);
-      const product = PRODUCTS[payload?.product];
-      if (!product) return sendJson(res, 400, { error: "Unknown product." });
+      const parsed = parseCartPayload(payload);
+      if (parsed.error) return sendJson(res, 400, { error: parsed.error });
 
       // Re-verify the shipping address server-side before taking payment.
       const shippingIn = payload?.shipping || {};
@@ -715,7 +798,7 @@ const server = http.createServer(async (req, res) => {
         const confirmation = "RTS-" + Math.random().toString(36).slice(2, 8).toUpperCase();
         console.log("⚠️  STRIPE_SECRET_KEY not set — mocking order:", {
           confirmation,
-          product: payload.product,
+          cart: parsed.productSummary,
         });
         return sendJson(res, 200, { mock: true, confirmation });
       }
@@ -723,23 +806,14 @@ const server = http.createServer(async (req, res) => {
       const origin = getOrigin(req);
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
-        // Note: payment_method_types is intentionally omitted to enable
-        // Stripe dynamic payment methods (configure them in the Dashboard).
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: "usd",
-              unit_amount: product.amount,
-              product_data: { name: product.name, description: product.description },
-            },
-          },
-        ],
+        line_items: parsed.lineItems,
         customer_email: shipping.email,
         success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?checkout=cancel`,
         metadata: {
-          product: payload.product,
+          cart: parsed.productSummary,
+          cart_json: parsed.cartJson.slice(0, 450),
+          product: parsed.items.length === 1 ? parsed.items[0].product : "cart",
           ship_name: shipping.name || "",
           ship_street1: shipping.street1 || "",
           ship_street2: shipping.street2 || "",
@@ -768,11 +842,13 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { paid: false });
       }
       const session = await stripe.checkout.sessions.retrieve(id);
+      const items = cartFromMetadata(session.metadata);
       return sendJson(res, 200, {
         paid: session.payment_status === "paid",
         confirmation: (session.id || "").replace(/^cs_(test_|live_)?/, "").slice(0, 8).toUpperCase(),
         email: session.customer_details?.email || session.customer_email || "",
         product: session.metadata?.product || "",
+        cart: items,
         amountTotal: session.amount_total,
       });
     } catch (e) {

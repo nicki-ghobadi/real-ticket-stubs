@@ -104,27 +104,61 @@
       <div class="modal-card">
         <button class="modal-close" type="button" data-close aria-label="Close">&times;</button>
 
-        <!-- Step 1: choose -->
+        <!-- Step 1: shop + cart -->
         <section class="modal-step" data-step="choose">
           <h2 id="modal-title">Get your ticket stub</h2>
-          <p class="modal-sub">Print it yourself at home, or have a real printed stub mailed to your door on thermal-style card stock.</p>
+          <p class="modal-sub">Print at home for free, or add printed / framed copies to your cart and check out once.</p>
 
-          <div class="choice-grid">
-            <button type="button" class="choice" data-action="print">
-              <div class="choice-title">Print at home</div>
-              <div class="choice-price">Free</div>
-              <div class="choice-meta">Send to your own printer. Best on white card stock.</div>
-            </button>
-            <button type="button" class="choice choice-primary" data-action="order" data-product="mail">
-              <div class="choice-title">Mail me a printed stub</div>
-              <div class="choice-price">$3.99</div>
-              <div class="choice-meta">Thermal-style cardstock, perforated, shipped in 3–5 days.</div>
-            </button>
-            <button type="button" class="choice" data-action="order" data-product="framed">
-              <div class="choice-title">Framed stub for the wall</div>
-              <div class="choice-price">$29.99</div>
-              <div class="choice-meta">Printed stub mounted in a nice frame, ready to hang.</div>
-            </button>
+          <button type="button" class="choice" data-action="print">
+            <div class="choice-title">Print at home</div>
+            <div class="choice-price">Free</div>
+            <div class="choice-meta">Send to your own printer. Best on white card stock.</div>
+          </button>
+
+          <p class="shop-heading">Order printed copies</p>
+
+          <div class="shop-product" data-product="mail">
+            <div class="shop-product-body">
+              <div class="shop-product-title">Mail me a printed stub</div>
+              <div class="shop-product-meta">Thermal-style cardstock, perforated, shipped in 3–5 days.</div>
+            </div>
+            <div class="shop-product-side">
+              <div class="shop-product-price">$3.99</div>
+              <div class="qty-control" aria-label="Quantity for mailed stub">
+                <button type="button" class="qty-btn" data-qty-delta="-1" aria-label="Decrease quantity">−</button>
+                <input type="number" class="qty-input" value="1" min="1" max="99" inputmode="numeric" aria-label="Quantity" />
+                <button type="button" class="qty-btn" data-qty-delta="1" aria-label="Increase quantity">+</button>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm btn-add-cart">Add to cart</button>
+            </div>
+          </div>
+
+          <div class="shop-product" data-product="framed">
+            <div class="shop-product-body">
+              <div class="shop-product-title">Framed stub for the wall</div>
+              <div class="shop-product-meta">Printed stub mounted in a nice frame, ready to hang.</div>
+            </div>
+            <div class="shop-product-side">
+              <div class="shop-product-price">$29.99</div>
+              <div class="qty-control" aria-label="Quantity for framed stub">
+                <button type="button" class="qty-btn" data-qty-delta="-1" aria-label="Decrease quantity">−</button>
+                <input type="number" class="qty-input" value="1" min="1" max="99" inputmode="numeric" aria-label="Quantity" />
+                <button type="button" class="qty-btn" data-qty-delta="1" aria-label="Increase quantity">+</button>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm btn-add-cart">Add to cart</button>
+            </div>
+          </div>
+
+          <div class="cart-panel hidden" id="cart-panel">
+            <p class="shop-heading cart-heading">Your cart</p>
+            <ul class="cart-lines" id="cart-lines"></ul>
+            <div class="cart-footer">
+              <div class="cart-total-row">
+                <span>Cart total</span>
+                <strong id="cart-total">$0.00</strong>
+              </div>
+              <button type="button" class="btn btn-primary" id="cart-checkout-btn">Checkout</button>
+            </div>
           </div>
         </section>
 
@@ -189,10 +223,7 @@
           <h2>Payment</h2>
           <p class="modal-sub">Secure checkout powered by Stripe. Charges appear as "REAL TICKET STUBS".</p>
 
-          <div class="order-summary">
-            <div class="row"><span id="pay-summary-label">Printed stub mailed (1x)</span><span id="pay-summary-price">$3.99</span></div>
-            <div class="row total"><span>Total</span><span id="pay-summary-total">$3.99</span></div>
-          </div>
+          <div class="order-summary" id="pay-summary"></div>
 
           <p class="modal-sub" id="pay-redirect-note">
             You'll be securely redirected to Stripe to enter your card details, then brought back here.
