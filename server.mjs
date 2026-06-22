@@ -206,7 +206,7 @@ function parseStubPng(dataUrl) {
     return { error: "Malformed stub image data." };
   }
   const approxBytes = Math.floor((b64.length * 3) / 4);
-  if (approxBytes > 5 * 1024 * 1024) return { error: "Stub image is too large (5 MB max)." };
+  if (approxBytes > 15 * 1024 * 1024) return { error: "Stub image is too large (15 MB max)." };
   return { buffer: Buffer.from(b64, "base64") };
 }
 
