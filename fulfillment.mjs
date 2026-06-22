@@ -128,21 +128,25 @@ async function uploadStubPng(orderId, pngBuffer) {
   if (!persistenceEnabled || !isAllowedSupabaseUrl(SUPABASE_URL)) {
     return { path: "", error: "Storage not configured." };
   }
-  const path = `${orderId}/stub.png`;
+  if (!pngBuffer?.length) {
+    return { path: "", error: "Empty stub PNG." };
+  }
+  const objectPath = `${orderId}/stub.png`;
   try {
-    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${STUB_BUCKET}/${path}`, {
-      method: "POST",
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${STUB_BUCKET}/${objectPath}`, {
+      method: "PUT",
       headers: supabaseHeaders({
         "Content-Type": "image/png",
         "x-upsert": "true",
+        "Cache-Control": "3600",
       }),
       body: pngBuffer,
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
-      return { path: "", error: `Storage upload ${res.status} ${txt.slice(0, 160)}` };
+      return { path: "", error: `Storage upload ${res.status} ${txt.slice(0, 200)}` };
     }
-    return { path: `${STUB_BUCKET}/${path}` };
+    return { path: `${STUB_BUCKET}/${objectPath}`, bytes: pngBuffer.length };
   } catch (e) {
     return { path: "", error: `Storage upload failed: ${e.message}` };
   }
@@ -268,8 +272,14 @@ export async function createPendingOrder({
   let stubPngPath = "";
   if (stubPngBuffer?.length) {
     const uploaded = await uploadStubPng(orderId, stubPngBuffer);
-    if (uploaded.error) console.warn("Stub PNG upload failed:", uploaded.error);
-    else stubPngPath = uploaded.path;
+    if (uploaded.error) {
+      console.error("Stub PNG upload failed:", uploaded.error);
+      return { orderId, persisted: false, error: uploaded.error };
+    }
+    stubPngPath = uploaded.path;
+    console.log("🖼  Stub PNG stored:", stubPngPath, `(${Math.round((uploaded.bytes || 0) / 1024)} KB)`);
+  } else {
+    return { orderId, persisted: false, error: "Missing stub PNG for print fulfillment." };
   }
 
   const ticket = ticketSummary(cleanFields);
@@ -363,6 +373,16 @@ export async function completePaidOrder(orderInput) {
   }
 
   const stubFields = existing?.stubFields || sanitizeStubFields(orderInput.stubFields || {});
+  let stubPngPath = existing?.stubPngPath || orderInput.stubPngPath || "";
+
+  // Legacy/test path: upload PNG when completing without a pending order draft.
+  if (!stubPngPath && orderInput.stubPngBuffer?.length && (orderId || existing?.id)) {
+    const targetId = existing?.id || orderId;
+    const uploaded = await uploadStubPng(targetId, orderInput.stubPngBuffer);
+    if (uploaded.path) stubPngPath = uploaded.path;
+    else if (uploaded.error) console.error("Stub PNG upload on complete failed:", uploaded.error);
+  }
+
   const ticket = ticketSummary(stubFields);
   const order = {
     id: existing?.id || orderId,
@@ -377,7 +397,7 @@ export async function completePaidOrder(orderInput) {
     shipping: orderInput.shipping || existing?.shipping,
     ticket: orderInput.ticket || ticket,
     stubFields,
-    stubPngPath: existing?.stubPngPath || "",
+    stubPngPath,
     paymentIntent: orderInput.paymentIntent || "",
     addressStatus: orderInput.addressStatus || "unknown",
   };
@@ -422,6 +442,7 @@ export async function completePaidOrder(orderInput) {
     stripe_payment_intent: order.paymentIntent || "",
     address_status: order.addressStatus || "unknown",
     status: "paid",
+    ...(order.stubPngPath ? { stub_png_path: order.stubPngPath } : {}),
   };
 
   try {
@@ -449,7 +470,7 @@ export async function completePaidOrder(orderInput) {
           "Content-Type": "application/json",
           Prefer: "return=representation,resolution=ignore-duplicates",
         }),
-        body: JSON.stringify({ ...row, stub_png_path: "" }),
+        body: JSON.stringify({ ...row, stub_png_path: order.stubPngPath || "" }),
       });
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
@@ -563,8 +584,9 @@ async function buildOwnerEmail(order) {
 
   const stubUrl = order.stubPngPath ? await createSignedStubUrl(order.stubPngPath) : null;
   const stubLink = stubUrl
-    ? `<p style="margin:12px 0"><a href="${esc(stubUrl)}" style="color:#0066cc">Download print PNG (24h link)</a></p>`
-    : "";
+    ? `<p style="margin:12px 0"><a href="${esc(stubUrl)}" style="color:#0066cc">Download print PNG (24h link)</a></p>` +
+      `<p style="margin:8px 0"><img src="${esc(stubUrl)}" alt="Ticket stub preview" style="max-width:100%;border:1px solid #ddd" /></p>`
+    : `<p style="margin:12px 0;color:#c00">Print PNG missing — check Supabase Storage (order-stubs bucket).</p>`;
 
   const html = `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111;line-height:1.5;max-width:640px;margin:0 auto;padding:24px">
     <h1 style="font-size:20px;margin:0 0 4px">New order — ${esc(code)}</h1>
@@ -656,12 +678,22 @@ export async function sendOwnerNotification(order) {
   const { subject, html, text } = await buildOwnerEmail(order);
 
   const attachments = [];
-  const png = order.stubPngPath ? await downloadStubPng(order.stubPngPath) : null;
+  let png = null;
+  if (order.stubPngPath) {
+    png = await downloadStubPng(order.stubPngPath);
+    if (!png?.length) {
+      console.error("Owner email: could not download stub PNG from", order.stubPngPath);
+    }
+  } else {
+    console.error("Owner email: order has no stub_png_path — PNG not attached");
+  }
   if (png?.length) {
     attachments.push({
       filename: `stub-${code}.png`,
       content: png.toString("base64"),
+      content_type: "image/png",
     });
+    console.log(`📎 Attaching stub PNG (${Math.round(png.length / 1024)} KB) to owner email`);
   }
 
   return sendResendEmail({

@@ -1,20 +1,16 @@
 #!/usr/bin/env node
 /**
  * Smoke-test order persistence + confirmation email without Stripe.
+ * Uses the same pending-order → paid flow as production (includes stub PNG).
  *
- * Usage (from project root):
  *   node scripts/test-fulfillment.mjs
  *   node scripts/test-fulfillment.mjs --email you@example.com
- *
- * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY for DB test.
- * Requires RESEND_API_KEY + ORDER_FROM_EMAIL for email test.
- * Loads .env from the project root automatically.
  */
 import "../load-env.mjs";
 import {
-  saveOrder,
-  sendOrderConfirmation,
-  sendOwnerNotification,
+  createPendingOrder,
+  completePaidOrder,
+  getOrderById,
   persistenceEnabled,
   emailEnabled,
   ownerEmailEnabled,
@@ -28,32 +24,20 @@ const testEmail = emailFlag
 
 const sessionId = `cs_test_${Date.now().toString(36)}`;
 
-const sampleOrder = {
-  sessionId,
-  email: testEmail,
-  productKey: "mail",
-  productName: "Printed ticket stub — mailed to you",
-  amountTotal: 399,
-  currency: "usd",
-  shipping: {
-    name: "Test Customer",
-    line1: "123 Main St",
-    line2: "",
-    city: "San Jose",
-    state: "CA",
-    postalCode: "95110",
-    country: "US",
-  },
-  stubFields: {
-    eventLine2: "COLDPLAY",
-    venue: "HP PAVILION AT SAN JOSE",
-    datetime: "FRI JUL 18 2008 7:30 PM",
-    section: "117",
-    row: "14",
-    seat: "1",
-    barcode: "6540422223612",
-  },
-  addressStatus: "unknown",
+/** Minimal valid PNG (70 bytes) — exercises storage + email attachment pipeline. */
+const stubPngBuffer = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQI12P4z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+const stubFields = {
+  eventLine2: "COLDPLAY",
+  venue: "HP PAVILION AT SAN JOSE",
+  datetime: "FRI JUL 18 2008 7:30 PM",
+  section: "117",
+  row: "14",
+  seat: "1",
+  barcode: "6540422223612",
 };
 
 console.log("Real Ticket Stubs — fulfillment smoke test\n");
@@ -72,45 +56,64 @@ if (!persistenceEnabled && !emailEnabled && !ownerEmailEnabled) {
 let failed = false;
 
 if (persistenceEnabled) {
-  const stored = await saveOrder(sampleOrder);
-  if (stored.error) {
-    console.error("❌ Supabase write failed:", stored.error);
+  const pending = await createPendingOrder({
+    cartItems: [{ product: "mail", quantity: 1 }],
+    cartJson: JSON.stringify([{ product: "mail", quantity: 1 }]),
+    productKey: "mail",
+    productName: "Printed ticket stub — mailed to you",
+    stubFields,
+    stubPngBuffer,
+  });
+  if (pending.error) {
+    console.error("❌ Pending order / PNG upload failed:", pending.error);
     failed = true;
-  } else if (stored.created) {
-    console.log("✅ Supabase: order row created", stored.id ? `(id ${stored.id})` : "");
   } else {
-    console.log("↩️  Supabase: duplicate session (unexpected on fresh test id)");
-  }
-} else {
-  console.log("⏭  Skipping Supabase (not configured)");
-}
+    console.log("✅ Pending order created with stub PNG:", pending.orderId);
 
-if (emailEnabled) {
-  const mail = await sendOrderConfirmation(sampleOrder);
-  if (mail.error) {
-    console.error("❌ Resend failed:", mail.error);
-    failed = true;
-  } else if (mail.sent) {
-    console.log("✅ Resend: confirmation email sent to", testEmail);
-  } else {
-    console.log("⏭  Resend: skipped (no email on order)");
-  }
-} else {
-  console.log("⏭  Skipping Resend customer email (not configured)");
-}
+    const paid = await completePaidOrder({
+      orderId: pending.orderId,
+      sessionId,
+      email: testEmail,
+      productKey: "mail",
+      productName: "Printed ticket stub — mailed to you",
+      cartJson: JSON.stringify([{ product: "mail", quantity: 1 }]),
+      cartItems: [{ product: "mail", quantity: 1 }],
+      amountTotal: 399,
+      currency: "usd",
+      shipping: {
+        name: "Test Customer",
+        line1: "123 Main St",
+        city: "San Jose",
+        state: "CA",
+        postalCode: "95110",
+        country: "US",
+      },
+      addressStatus: "unknown",
+    });
 
-if (ownerEmailEnabled) {
-  const owner = await sendOwnerNotification(sampleOrder);
-  if (owner.error) {
-    console.error("❌ Owner alert failed:", owner.error);
-    failed = true;
-  } else if (owner.sent) {
-    console.log("✅ Resend: owner alert sent to", process.env.FULFILLMENT_EMAIL || process.env.ORDER_FROM_EMAIL);
+    if (paid.error) {
+      console.error("❌ completePaidOrder failed:", paid.error);
+      failed = true;
+    } else {
+      const row = await getOrderById(pending.orderId);
+      if (row?.stubPngPath) {
+        console.log("✅ Supabase stub_png_path:", row.stubPngPath);
+      } else {
+        console.error("❌ Supabase stub_png_path is empty on paid order");
+        failed = true;
+      }
+      if (emailEnabled && paid.created) {
+        console.log("✅ Customer confirmation email sent to", testEmail);
+      }
+      if (ownerEmailEnabled && paid.created) {
+        console.log("✅ Owner alert sent with PNG attachment to", process.env.FULFILLMENT_EMAIL || process.env.ORDER_FROM_EMAIL);
+      }
+    }
   }
-} else {
-  console.log("⏭  Skipping owner alert (set FULFILLMENT_EMAIL)");
+} else if (emailEnabled || ownerEmailEnabled) {
+  console.log("⏭  Skipping Supabase (not configured) — emails require a pending order with PNG");
 }
 
 console.log();
 if (failed) process.exit(1);
-console.log("Done. Check Supabase Table Editor → orders and your inbox.");
+console.log("Done. Check Supabase → orders (stub_png_path) + Storage → order-stubs, and your inbox.");

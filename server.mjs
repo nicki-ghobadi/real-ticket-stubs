@@ -836,7 +836,9 @@ const server = http.createServer(async (req, res) => {
         stubFields,
         stubPngBuffer: pngParsed.buffer,
       });
-      if (pending.error) console.warn("Pending order warning:", pending.error);
+      if (pending.error) {
+        return sendJson(res, 503, { error: "Could not save your stub for printing. Try again." });
+      }
 
       const origin = getOrigin(req);
       const session = await stripe.checkout.sessions.create({
