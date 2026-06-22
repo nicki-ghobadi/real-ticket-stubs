@@ -648,9 +648,10 @@ async function sendResendEmail({ to, subject, html, text, attachments, replyTo }
   });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
-    return { sent: false, error: `Resend ${res.status} ${txt.slice(0, 160)}` };
+    return { sent: false, error: `Resend ${res.status} ${txt.slice(0, 300)}` };
   }
-  return { sent: true };
+  const body = await res.json().catch(() => ({}));
+  return { sent: true, id: body.id };
 }
 
 export async function sendOrderConfirmation(order) {
@@ -678,22 +679,29 @@ export async function sendOwnerNotification(order) {
   const { subject, html, text } = await buildOwnerEmail(order);
 
   const attachments = [];
-  let png = null;
   if (order.stubPngPath) {
-    png = await downloadStubPng(order.stubPngPath);
-    if (!png?.length) {
-      console.error("Owner email: could not download stub PNG from", order.stubPngPath);
+    // Prefer a signed URL — Resend fetches the file (works better for large print PNGs).
+    const stubUrl = await createSignedStubUrl(order.stubPngPath, 86_400);
+    if (stubUrl) {
+      attachments.push({
+        filename: `stub-${code}.png`,
+        path: stubUrl,
+      });
+      console.log(`📎 Owner email: attaching stub via signed URL (${order.stubPngPath})`);
+    } else {
+      const png = await downloadStubPng(order.stubPngPath);
+      if (png?.length) {
+        attachments.push({
+          filename: `stub-${code}.png`,
+          content: png.toString("base64"),
+        });
+        console.log(`📎 Owner email: attaching stub PNG (${Math.round(png.length / 1024)} KB)`);
+      } else {
+        console.error("Owner email: could not download stub PNG from", order.stubPngPath);
+      }
     }
   } else {
     console.error("Owner email: order has no stub_png_path — PNG not attached");
-  }
-  if (png?.length) {
-    attachments.push({
-      filename: `stub-${code}.png`,
-      content: png.toString("base64"),
-      content_type: "image/png",
-    });
-    console.log(`📎 Attaching stub PNG (${Math.round(png.length / 1024)} KB) to owner email`);
   }
 
   return sendResendEmail({
