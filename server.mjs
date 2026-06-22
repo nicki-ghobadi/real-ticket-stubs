@@ -11,10 +11,13 @@ import Stripe from "stripe";
 import { validateShippingComplete, validateAddressWithGoogle } from "./shipping-verify-server.mjs";
 import { normalizeExtractedFields } from "./public/templates.js";
 import {
-  saveOrder,
-  sendOrderConfirmation,
+  createPendingOrder,
+  linkStripeSession,
+  completePaidOrder,
+  sanitizeStubFields,
   persistenceEnabled,
   emailEnabled,
+  ownerEmailEnabled,
 } from "./fulfillment.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -105,6 +108,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY !== "false";
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB decoded image
 const MAX_EXTRACT_BODY = 14 * 1024 * 1024; // base64 inflates ~33% + JSON wrapper
 const MAX_JSON_BODY = 64 * 1024; // 64 KB for ordinary JSON endpoints
+const MAX_CHECKOUT_BODY = 12 * 1024 * 1024; // stub PNG base64 at checkout
 const MAX_WEBHOOK_BODY = 1024 * 1024; // 1 MB Stripe webhook payload
 
 // Stripe Payment Links — set in .env, never in source code.
@@ -187,7 +191,23 @@ function parseCartPayload(payload) {
     .map(({ product, quantity }) => `${PRODUCTS[product].name} × ${quantity}`)
     .join(", ");
 
-  return { items, lineItems, cartJson, productSummary, productName };
+  return { items, lineItems, cartJson, productSummary, productName, productKey: items.length === 1 ? items[0].product : "cart" };
+}
+
+/** Decode a PNG data-URL from checkout (print-ready stub). */
+function parseStubPng(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== "string") {
+    return { error: "Missing stub image. Render your stub before checkout." };
+  }
+  const m = dataUrl.match(/^data:image\/png;base64,/i);
+  if (!m) return { error: "Invalid stub image. Try exporting the stub again." };
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64.slice(0, 256))) {
+    return { error: "Malformed stub image data." };
+  }
+  const approxBytes = Math.floor((b64.length * 3) / 4);
+  if (approxBytes > 5 * 1024 * 1024) return { error: "Stub image is too large (5 MB max)." };
+  return { buffer: Buffer.from(b64, "base64") };
 }
 
 /** Parse cart from Stripe session metadata (webhook / success page). */
@@ -658,8 +678,8 @@ async function handleCheckoutCompleted(sessionObj) {
       }
     }
 
-    // Assemble the canonical order record.
     const order = {
+      orderId: session?.metadata?.order_id || "",
       sessionId: session?.id || "",
       email,
       productKey: product.key,
@@ -669,26 +689,14 @@ async function handleCheckoutCompleted(sessionObj) {
       amountTotal: session?.amount_total ?? null,
       currency: session?.currency || "usd",
       shipping: ship,
-      ticket: {
-        artist: session?.metadata?.artist || "",
-        venue: session?.metadata?.venue || "",
-        datetime: session?.metadata?.datetime || "",
-      },
+      paymentIntent: session?.payment_intent || "",
       addressStatus,
     };
 
-    // Persist (idempotent on the Stripe session id). Only send the confirmation
-    // email when this is a NEW order, so duplicate webhook deliveries don't
-    // double-email the customer.
-    const stored = await saveOrder(order);
-    if (stored.error) console.error("Order persistence error:", stored.error);
-
-    if (stored.created) {
-      const mail = await sendOrderConfirmation(order);
-      if (mail.error) console.error("Confirmation email error:", mail.error);
-      else if (mail.sent) console.log("✉️  Confirmation email sent to", email);
-    } else {
-      console.log("↩️  Duplicate webhook for", session?.id, "— skipping email.");
+    const fulfilled = await completePaidOrder(order);
+    if (fulfilled.error) console.error("Order fulfillment error:", fulfilled.error);
+    else if (!fulfilled.created) {
+      console.log("↩️  Duplicate webhook for", session?.id, "— skipping notifications.");
     }
 
     // TODO(production): submit the print job to your fulfillment partner.
@@ -798,11 +806,13 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && pathname === "/api/create-checkout-session") {
     if (!enforceRateLimit(req, res, "checkout", 15, 10 * 60_000)) return;
     try {
-      const payload = await readJson(req, MAX_JSON_BODY);
+      const payload = await readJson(req, MAX_CHECKOUT_BODY);
       const parsed = parseCartPayload(payload);
       if (parsed.error) return sendJson(res, 400, { error: parsed.error });
 
-      const item = payload?.item || {};
+      const stubFields = sanitizeStubFields(payload?.stubFields || payload?.item || {});
+      const pngParsed = parseStubPng(payload?.stubPng);
+      if (pngParsed.error) return sendJson(res, 400, { error: pngParsed.error });
 
       // Demo fallback for local dev only. Never mock payments in production.
       if (!stripe) {
@@ -813,28 +823,39 @@ const server = http.createServer(async (req, res) => {
         console.log("⚠️  STRIPE_SECRET_KEY not set — mocking order:", {
           confirmation,
           cart: parsed.productSummary,
+          stub: stubFields.eventLine2 || stubFields.section || "(empty)",
         });
         return sendJson(res, 200, { mock: true, confirmation });
       }
+
+      const pending = await createPendingOrder({
+        cartItems: parsed.items,
+        cartJson: parsed.cartJson,
+        productKey: parsed.productKey,
+        productName: parsed.productName,
+        stubFields,
+        stubPngBuffer: pngParsed.buffer,
+      });
+      if (pending.error) console.warn("Pending order warning:", pending.error);
 
       const origin = getOrigin(req);
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
         line_items: parsed.lineItems,
-        // Email + shipping collected on Stripe's hosted page (no duplicate form in our app).
         shipping_address_collection: { allowed_countries: ["US", "CA"] },
         success_url: `${origin}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/?checkout=cancel`,
         metadata: {
+          order_id: pending.orderId,
           cart: parsed.productSummary,
           cart_json: parsed.cartJson.slice(0, 450),
-          product: parsed.items.length === 1 ? parsed.items[0].product : "cart",
-          artist: (item.artist || "").slice(0, 120),
-          venue: (item.venue || "").slice(0, 120),
-          datetime: (item.datetime || "").slice(0, 120),
+          product: parsed.productKey,
         },
       });
-      return sendJson(res, 200, { url: session.url });
+
+      await linkStripeSession(pending.orderId, session.id);
+
+      return sendJson(res, 200, { url: session.url, orderId: pending.orderId });
     } catch (e) {
       return handleError(res, "Create checkout session", e);
     }
@@ -971,7 +992,8 @@ server.listen(PORT, () => {
   console.log(`  🔗 Payment links: ${linkCount}/2 configured (STRIPE_PAYMENT_LINK_MAIL / _FRAMED in .env)`);
   console.log(`  📦 Address deliverability check: ${ADDRESS_VALIDATION ? "Google Address Validation ON" : "off (set GOOGLE_ADDRESS_VALIDATION_API_KEY)"}`);
   console.log(`  🗄  Order persistence: ${persistenceEnabled ? "Supabase ON" : "off (set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)"}`);
-  console.log(`  ✉️  Confirmation emails: ${emailEnabled ? "Resend ON" : "off (set RESEND_API_KEY + ORDER_FROM_EMAIL)"}`);
+  console.log(`  ✉️  Customer emails: ${emailEnabled ? "Resend ON" : "off (set RESEND_API_KEY + ORDER_FROM_EMAIL)"}`);
+  console.log(`  📬 Owner alerts: ${ownerEmailEnabled ? `Resend → ${process.env.FULFILLMENT_EMAIL || process.env.ORDER_FROM_EMAIL}` : "off (set FULFILLMENT_EMAIL + RESEND_API_KEY)"}`);
   console.log(`  🔒 CORS allowlist: ${ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS.join(", ") : "same-origin only"}`);
   console.log(`  🖼  frame-ancestors: ${FRAME_ANCESTORS}`);
   if (!IS_PROD) console.log("  ℹ️  Set NODE_ENV=production in production to enable HSTS.");

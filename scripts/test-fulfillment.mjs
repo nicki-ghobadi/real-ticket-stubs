@@ -14,8 +14,10 @@ import "../load-env.mjs";
 import {
   saveOrder,
   sendOrderConfirmation,
+  sendOwnerNotification,
   persistenceEnabled,
   emailEnabled,
+  ownerEmailEnabled,
 } from "../fulfillment.mjs";
 
 const args = process.argv.slice(2);
@@ -42,10 +44,14 @@ const sampleOrder = {
     postalCode: "95110",
     country: "US",
   },
-  ticket: {
-    artist: "COLDPLAY",
-    venue: "HP PAVILION",
+  stubFields: {
+    eventLine2: "COLDPLAY",
+    venue: "HP PAVILION AT SAN JOSE",
     datetime: "FRI JUL 18 2008 7:30 PM",
+    section: "117",
+    row: "14",
+    seat: "1",
+    barcode: "6540422223612",
   },
   addressStatus: "unknown",
 };
@@ -53,11 +59,12 @@ const sampleOrder = {
 console.log("Real Ticket Stubs — fulfillment smoke test\n");
 console.log("  Persistence:", persistenceEnabled ? "configured" : "OFF (set SUPABASE_* in .env)");
 console.log("  Email:      ", emailEnabled ? "configured" : "OFF (set RESEND_* in .env)");
+console.log("  Owner alert:", ownerEmailEnabled ? "configured" : "OFF (set FULFILLMENT_EMAIL in .env)");
 console.log("  Test email: ", testEmail);
 console.log("  Session id: ", sessionId);
 console.log();
 
-if (!persistenceEnabled && !emailEnabled) {
+if (!persistenceEnabled && !emailEnabled && !ownerEmailEnabled) {
   console.error("Nothing to test. Add Supabase and/or Resend keys to .env first.");
   process.exit(1);
 }
@@ -89,7 +96,19 @@ if (emailEnabled) {
     console.log("⏭  Resend: skipped (no email on order)");
   }
 } else {
-  console.log("⏭  Skipping Resend (not configured)");
+  console.log("⏭  Skipping Resend customer email (not configured)");
+}
+
+if (ownerEmailEnabled) {
+  const owner = await sendOwnerNotification(sampleOrder);
+  if (owner.error) {
+    console.error("❌ Owner alert failed:", owner.error);
+    failed = true;
+  } else if (owner.sent) {
+    console.log("✅ Resend: owner alert sent to", process.env.FULFILLMENT_EMAIL || process.env.ORDER_FROM_EMAIL);
+  }
+} else {
+  console.log("⏭  Skipping owner alert (set FULFILLMENT_EMAIL)");
 }
 
 console.log();

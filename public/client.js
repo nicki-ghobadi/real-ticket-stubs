@@ -105,18 +105,15 @@ async function waitForFonts() {
   }
 }
 
-async function exportPng() {
+async function exportStubPngDataUrl() {
   if (!window.htmlToImage) {
-    setStatus("PNG renderer not loaded — check your network.", "err");
-    return;
+    throw new Error("PNG renderer not loaded — check your network.");
   }
-  setStatus("Loading fonts...", "working");
   await waitForFonts();
   const ctx = makeOffscreenClone();
-  if (!ctx) return;
+  if (!ctx) throw new Error("No stub to export — fill in your ticket details first.");
   try {
-    setStatus("Generating PNG...", "working");
-    const dataUrl = await window.htmlToImage.toPng(ctx.clone, {
+    return await window.htmlToImage.toPng(ctx.clone, {
       width: 1300,
       height: 589,
       pixelRatio: 3,
@@ -124,6 +121,15 @@ async function exportPng() {
       cacheBust: true,
       skipFonts: false,
     });
+  } finally {
+    ctx.host.remove();
+  }
+}
+
+async function exportPng() {
+  try {
+    setStatus("Generating PNG...", "working");
+    const dataUrl = await exportStubPngDataUrl();
     const link = document.createElement("a");
     link.download = `ticketmaster-stub-${Date.now()}.png`;
     link.href = dataUrl;
@@ -131,8 +137,6 @@ async function exportPng() {
     setStatus("PNG downloaded (3900x1767, 300dpi-equivalent).", "ok");
   } catch (e) {
     setStatus("PNG export failed: " + (e?.message || e), "err");
-  } finally {
-    ctx.host.remove();
   }
 }
 
@@ -854,14 +858,11 @@ function showStep(name) {
 
 /** Create a Stripe Checkout Session for the cart and return either
  *  { url } (redirect to Stripe) or { mock, confirmation } (demo fallback). */
-async function createCheckoutSession() {
+async function createCheckoutSession(stubFields, stubPng) {
   const payload = {
     cart: cart.map((item) => ({ product: item.product, quantity: item.quantity })),
-    item: {
-      artist: state.fields.eventLine2 || "",
-      venue: state.fields.venue || "",
-      datetime: state.fields.datetime || "",
-    },
+    stubFields,
+    stubPng,
   };
 
   const res = await fetch(api("/api/create-checkout-session"), {
@@ -891,10 +892,19 @@ async function startCheckout() {
   const prevLabel = btn?.textContent || "Checkout with Stripe";
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Redirecting to Stripe…";
+    btn.textContent = "Preparing order…";
   }
   try {
-    const result = await createCheckoutSession();
+    const stubFields = { ...readForm() };
+    let stubPng;
+    try {
+      if (btn) btn.textContent = "Rendering stub…";
+      stubPng = await exportStubPngDataUrl();
+    } catch (e) {
+      throw new Error(e?.message || "Could not prepare stub image for printing.");
+    }
+    if (btn) btn.textContent = "Redirecting to Stripe…";
+    const result = await createCheckoutSession(stubFields, stubPng);
     if (result.url) {
       goToStripe(result.url);
       return;
