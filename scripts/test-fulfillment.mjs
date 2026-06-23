@@ -7,6 +7,7 @@
  *   node scripts/test-fulfillment.mjs --email you@example.com
  */
 import "../load-env.mjs";
+import { minStubPngBuffer } from "./png-fixture.mjs";
 import {
   createPendingOrder,
   completePaidOrder,
@@ -23,12 +24,7 @@ const testEmail = emailFlag
   : process.env.TEST_ORDER_EMAIL || "test@example.com";
 
 const sessionId = `cs_test_${Date.now().toString(36)}`;
-
-/** Minimal valid PNG (70 bytes) — exercises storage + email attachment pipeline. */
-const stubPngBuffer = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQI12P4z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-  "base64",
-);
+const stubPngBuffer = minStubPngBuffer();
 
 const stubFields = {
   eventLine2: "COLDPLAY",

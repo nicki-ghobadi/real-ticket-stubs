@@ -6,6 +6,7 @@
  *   node scripts/smoke-test.mjs --base http://localhost:3456
  */
 import "../load-env.mjs";
+import { minStubPngDataUrl } from "./png-fixture.mjs";
 import { normalizeExtractedFields, prepareTicketData } from "../public/templates.js";
 import { validateShippingFormat } from "../public/shipping-validation.js";
 
@@ -108,8 +109,6 @@ try {
   if (config.res.status === 200 && config.json?.hasPaymentLinks !== undefined) ok("/api/config");
   else fail("/api/config");
 
-  const tinyPng =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAD0lEQVQI12P4z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
   const checkout = await post("/api/create-checkout-session", {
     cart: [{ product: "mail", quantity: 1 }],
     stubFields: {
@@ -120,7 +119,7 @@ try {
       row: "14",
       seat: "1",
     },
-    stubPng: tinyPng,
+    stubPng: minStubPngDataUrl(),
   });
   if (checkout.res.status === 200 && checkout.json?.url?.includes("checkout.stripe.com")) {
     ok("POST /api/create-checkout-session");

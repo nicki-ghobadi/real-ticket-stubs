@@ -56,40 +56,47 @@ function upper(s) {
   return String(s || "").toUpperCase();
 }
 
+function drawBarcode(svg, barcode) {
+  if (!svg || !window.JsBarcode || !barcode) return;
+  try {
+    JsBarcode(svg, barcode, {
+      format: "CODE128",
+      width: 1.8,
+      height: 48,
+      displayValue: false,
+      margin: 0,
+      background: "transparent",
+      lineColor: "#000000",
+    });
+  } catch (e) {
+    console.warn("JsBarcode skipped:", e?.message || e);
+  }
+}
+
 function renderStub(fields) {
   const d = prepareTicketData(fields);
   const stage = $("#stub-stage");
   stage.innerHTML = buildTicketHtml(d);
-
-  const svg = stage.querySelector(".tm-barcode");
-  if (svg && window.JsBarcode && d.barcode) {
-    try {
-      JsBarcode(svg, d.barcode, {
-        format: "CODE128",
-        width: 1.8,
-        height: 48,
-        displayValue: false,
-        margin: 0,
-        background: "transparent",
-        lineColor: "#000000",
-      });
-    } catch (e) {
-      console.warn("JsBarcode skipped:", e?.message || e);
-    }
-  }
+  drawBarcode(stage.querySelector(".tm-barcode"), d.barcode);
 }
 
 /** Clone the ticket into an off-screen, full-size container so the export
  *  isn't affected by the preview transform: scale(0.5). */
-function makeOffscreenClone() {
+function makeOffscreenClone(fields) {
   const live = document.querySelector(".tm");
   if (!live) return null;
+  const d = prepareTicketData(fields || readForm());
   const clone = live.cloneNode(true);
   clone.style.transform = "none";
+  clone.style.transformOrigin = "top left";
+  clone.style.width = "1300px";
+  clone.style.height = "589px";
+  drawBarcode(clone.querySelector(".tm-barcode"), d.barcode);
+
   const host = document.createElement("div");
   host.style.cssText =
     "position:fixed; left:-99999px; top:0; width:1300px; height:589px; " +
-    "background:#fff; overflow:hidden; z-index:-1;";
+    "background:#fff; overflow:hidden; z-index:-1; opacity:1;";
   host.appendChild(clone);
   document.body.appendChild(host);
   return { host, clone };
@@ -105,14 +112,30 @@ async function waitForFonts() {
   }
 }
 
+async function waitForPaint() {
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise((r) => setTimeout(r, 80));
+}
+
 async function exportStubPngDataUrl() {
   if (!window.htmlToImage) {
     throw new Error("PNG renderer not loaded — check your network.");
   }
+  const fields = readForm();
+  renderStub(fields);
   await waitForFonts();
-  const ctx = makeOffscreenClone();
+  if (document.fonts?.load) {
+    try {
+      await document.fonts.load('700 14px "OCR A Std"');
+      await document.fonts.load('700 14px "Courier New"');
+    } catch {
+      /* fallback fonts */
+    }
+  }
+  const ctx = makeOffscreenClone(fields);
   if (!ctx) throw new Error("No stub to export — fill in your ticket details first.");
   try {
+    await waitForPaint();
     return await window.htmlToImage.toPng(ctx.clone, {
       width: 1300,
       height: 589,
@@ -120,6 +143,7 @@ async function exportStubPngDataUrl() {
       backgroundColor: "#ffffff",
       cacheBust: true,
       skipFonts: false,
+      includeQueryParams: true,
     });
   } finally {
     ctx.host.remove();
@@ -147,7 +171,7 @@ async function exportSvg() {
   }
   setStatus("Loading fonts...", "working");
   await waitForFonts();
-  const ctx = makeOffscreenClone();
+  const ctx = makeOffscreenClone(readForm());
   if (!ctx) return;
   try {
     setStatus("Generating SVG...", "working");

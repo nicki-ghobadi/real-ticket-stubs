@@ -277,7 +277,11 @@ export async function createPendingOrder({
       return { orderId, persisted: false, error: uploaded.error };
     }
     stubPngPath = uploaded.path;
-    console.log("🖼  Stub PNG stored:", stubPngPath, `(${Math.round((uploaded.bytes || 0) / 1024)} KB)`);
+    console.log(
+      "🖼  Stub PNG stored:",
+      stubPngPath,
+      `(${Math.round((uploaded.bytes || 0) / 1024)} KB)`,
+    );
   } else {
     return { orderId, persisted: false, error: "Missing stub PNG for print fulfillment." };
   }

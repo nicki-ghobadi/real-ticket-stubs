@@ -194,6 +194,13 @@ function parseCartPayload(payload) {
   return { items, lineItems, cartJson, productSummary, productName, productKey: items.length === 1 ? items[0].product : "cart" };
 }
 
+/** Decode PNG IHDR width/height. */
+function pngDimensions(buffer) {
+  if (!buffer || buffer.length < 24) return null;
+  if (buffer.toString("ascii", 1, 4) !== "PNG") return null;
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
 /** Decode a PNG data-URL from checkout (print-ready stub). */
 function parseStubPng(dataUrl) {
   if (!dataUrl || typeof dataUrl !== "string") {
@@ -205,9 +212,15 @@ function parseStubPng(dataUrl) {
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64.slice(0, 256))) {
     return { error: "Malformed stub image data." };
   }
-  const approxBytes = Math.floor((b64.length * 3) / 4);
-  if (approxBytes > 15 * 1024 * 1024) return { error: "Stub image is too large (15 MB max)." };
-  return { buffer: Buffer.from(b64, "base64") };
+  const buffer = Buffer.from(b64, "base64");
+  if (buffer.length > 15 * 1024 * 1024) return { error: "Stub image is too large (15 MB max)." };
+  const dim = pngDimensions(buffer);
+  if (!dim || dim.width < 1000 || dim.height < 400) {
+    return {
+      error: "Stub image looks blank or too small. Fill in your ticket stub preview, then try checkout again.",
+    };
+  }
+  return { buffer, dimensions: dim };
 }
 
 /** Parse cart from Stripe session metadata (webhook / success page). */
@@ -814,7 +827,7 @@ const server = http.createServer(async (req, res) => {
       const pngParsed = parseStubPng(payload?.stubPng);
       if (pngParsed.error) return sendJson(res, 400, { error: pngParsed.error });
 
-      // Demo fallback for local dev only. Never mock payments in production.
+      // Demo fallback for local dev only.
       if (!stripe) {
         if (IS_PROD) {
           return sendJson(res, 503, { error: "Payments are not configured." });
