@@ -12,6 +12,13 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
+/** Trim header grid values so long section/aisle text cannot spill into adjacent columns. */
+function fitHead(s, maxLen) {
+  const t = String(s ?? "");
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, Math.max(1, maxLen - 1))}…`;
+}
+
 function shortDate(datetime) {
   const m = String(datetime).match(
     /(\d{1,2})\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*(\d{2,4})/i,
@@ -253,6 +260,11 @@ export function prepareTicketData(raw) {
   const promo = pick(f.promo, "WWW.TICKETMASTER.COM");
   const disclaimer = pick(f.disclaimer, "NO CAMERAS OR RECORDERS");
 
+  const artistLen = artist.length;
+  const artistClass =
+    artistLen > 28 ? "tm-artist-long" : artistLen > 18 ? "tm-artist-med" : "";
+  const venueClass = venue.length > 35 ? "tm-venue-long" : "";
+
   return {
     code: ticketCode,
     headerRight,
@@ -271,8 +283,10 @@ export function prepareTicketData(raw) {
     cn,
     promo,
     artist,
+    artistClass,
     tour,
     venue,
+    venueClass,
     disclaimer,
     datetime,
     dateShort: pick(f.dateShort, shortDate(datetime)),
@@ -336,11 +350,11 @@ export function buildTicketHtml(d) {
   // Center: header + event
   parts.push('<section class="tm-center">');
   parts.push('<div class="tm-head-vals">');
-  parts.push(`<span>${esc(d.section)}</span>`);
-  parts.push(`<span>${esc(d.row)}</span>`);
-  parts.push(`<span>${esc(d.seat)}</span>`);
-  parts.push(`<span>${esc(d.admissionType)}</span>`);
-  parts.push(`<span>${esc(d.headerRight)}</span>`);
+  parts.push(`<span>${esc(fitHead(d.section, 14))}</span>`);
+  parts.push(`<span>${esc(fitHead(d.row, 8))}</span>`);
+  parts.push(`<span>${esc(fitHead(d.seat, 6))}</span>`);
+  parts.push(`<span>${esc(fitHead(d.admissionType, 10))}</span>`);
+  parts.push(`<span>${esc(fitHead(d.headerRight, 12))}</span>`);
   parts.push('</div>');
   parts.push('<div class="tm-head-lbls">');
   parts.push('<span>SECTION/AISLE</span>');
@@ -357,9 +371,9 @@ export function buildTicketHtml(d) {
   parts.push('<div class="tm-event">');
   parts.push('<div class="tm-wm" aria-hidden="true">ticketmaster</div>');
   parts.push(`<p class="tm-promo">${esc(d.promo)}</p>`);
-  parts.push(`<p class="tm-artist">${esc(d.artist)}</p>`);
+  parts.push(`<p class="tm-artist${d.artistClass ? " " + d.artistClass : ""}">${esc(d.artist)}</p>`);
   parts.push(`<p class="tm-tour">${esc(d.tour)}</p>`);
-  parts.push(`<p class="tm-venue">${esc(d.venue)}</p>`);
+  parts.push(`<p class="tm-venue${d.venueClass ? " " + d.venueClass : ""}">${esc(d.venue)}</p>`);
   parts.push(`<p class="tm-disclaim">${esc(d.disclaimer)}</p>`);
   parts.push(`<p class="tm-datetime">${esc(d.datetime)}</p>`);
   parts.push('</div>');

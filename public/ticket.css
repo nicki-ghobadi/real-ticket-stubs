@@ -153,8 +153,13 @@
   position: absolute;
   left: 14px;
   top: 212px;
+  max-width: 180px;
   font-size: 42px;
   font-weight: 700;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-left-aux {
@@ -251,6 +256,16 @@
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 0.02em;
+  overflow: hidden;
+}
+
+.tm-head-vals > span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-head-lbls {
@@ -270,6 +285,13 @@
   letter-spacing: 0.04em;
 }
 
+.tm-head-lbls > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tm-sub {
   position: absolute;
   left: 0;
@@ -285,18 +307,30 @@
   position: absolute;
   left: 22px;
   top: 6px;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-sub-price {
   position: absolute;
   left: 380px;
   top: 6px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-sub-evnum {
   position: absolute;
   left: 548px;
   top: 6px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-event {
@@ -354,6 +388,19 @@
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.02em;
+  max-width: 664px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-artist.tm-artist-med {
+  font-size: 54px;
+}
+
+.tm-artist.tm-artist-long {
+  font-size: 42px;
+  letter-spacing: 0.01em;
 }
 
 .tm-tour {
@@ -361,6 +408,10 @@
   font-size: 32px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  max-width: 664px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-venue {
@@ -368,6 +419,16 @@
   font-size: 32px;
   font-weight: 700;
   letter-spacing: 0.03em;
+  max-width: 664px;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tm-venue.tm-venue-long {
+  font-size: 26px;
 }
 
 .tm-disclaim {
@@ -375,6 +436,10 @@
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 0.03em;
+  max-width: 664px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-datetime {
@@ -382,6 +447,10 @@
   font-size: 34px;
   font-weight: 700;
   letter-spacing: 0.03em;
+  max-width: 664px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ───── RIGHT STUB (920–1300, 380px wide) ─────
@@ -481,6 +550,10 @@
 .tm-r-val {
   font-size: 30px;
   align-self: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .tm-r-side {
@@ -489,6 +562,10 @@
   letter-spacing: 0.01em;
   align-self: end;
   padding-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .tm-r-seat-box {
@@ -610,6 +687,26 @@
   text-align: center;
   padding: 22px 0;
   box-sizing: border-box;
+}
+
+/* Off-screen full-size render target for PNG export (no preview scaling). */
+.stub-export-host {
+  position: fixed;
+  left: -99999px;
+  top: 0;
+  width: 1300px;
+  height: 589px;
+  overflow: hidden;
+  background: #fff;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.stub-export-host .tm {
+  position: relative;
+  transform: none !important;
+  width: 1300px;
+  height: 589px;
 }
 
 /* Preview scaling — fluid width via container queries (phones → laptops). */

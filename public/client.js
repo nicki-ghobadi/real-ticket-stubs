@@ -80,26 +80,41 @@ function renderStub(fields) {
   drawBarcode(stage.querySelector(".tm-barcode"), d.barcode);
 }
 
-/** Clone the ticket into an off-screen, full-size container so the export
- *  isn't affected by the preview transform: scale(0.5). */
-function makeOffscreenClone(fields) {
-  const live = document.querySelector(".tm");
-  if (!live) return null;
-  const d = prepareTicketData(fields || readForm());
-  const clone = live.cloneNode(true);
-  clone.style.transform = "none";
-  clone.style.transformOrigin = "top left";
-  clone.style.width = "1300px";
-  clone.style.height = "589px";
-  drawBarcode(clone.querySelector(".tm-barcode"), d.barcode);
+/** Font sizes used on the stub — preload before PNG export so metrics match the preview. */
+const STUB_FONT_SPECS = [
+  '700 12px Arial',
+  '700 14px "Courier New"',
+  '700 28px "OCR A Std"',
+  '700 30px "OCR A Std"',
+  '700 32px "OCR A Std"',
+  '700 34px "OCR A Std"',
+  '700 48px "OCR A Std"',
+  '700 70px "Arial Black"',
+  '900 70px "Arial Black"',
+  '700 110px "Helvetica Neue"',
+];
 
+async function preloadStubFonts() {
+  await waitForFonts();
+  if (!document.fonts?.load) return;
+  await Promise.all(
+    STUB_FONT_SPECS.map((spec) => document.fonts.load(spec).catch(() => {})),
+  );
+  await document.fonts.ready;
+}
+
+/** Build a fresh full-size stub for PNG export (never clone the scaled preview). */
+function createExportNode(fields) {
+  const d = prepareTicketData(fields || readForm());
   const host = document.createElement("div");
-  host.style.cssText =
-    "position:fixed; left:-99999px; top:0; width:1300px; height:589px; " +
-    "background:#fff; overflow:hidden; z-index:-1; opacity:1;";
-  host.appendChild(clone);
+  host.className = "stub-export-host";
+  host.setAttribute("aria-hidden", "true");
+  host.innerHTML = buildTicketHtml(d);
+  const node = host.querySelector(".tm");
+  if (!node) return null;
+  drawBarcode(node.querySelector(".tm-barcode"), d.barcode);
   document.body.appendChild(host);
-  return { host, clone };
+  return { host, node };
 }
 
 async function waitForFonts() {
@@ -123,26 +138,20 @@ async function exportStubPngDataUrl() {
   }
   const fields = readForm();
   renderStub(fields);
-  await waitForFonts();
-  if (document.fonts?.load) {
-    try {
-      await document.fonts.load('700 14px "OCR A Std"');
-      await document.fonts.load('700 14px "Courier New"');
-    } catch {
-      /* fallback fonts */
-    }
-  }
-  const ctx = makeOffscreenClone(fields);
+  await preloadStubFonts();
+  const ctx = createExportNode(fields);
   if (!ctx) throw new Error("No stub to export — fill in your ticket details first.");
   try {
     await waitForPaint();
-    return await window.htmlToImage.toPng(ctx.clone, {
+    await waitForPaint();
+    return await window.htmlToImage.toPng(ctx.node, {
       width: 1300,
       height: 589,
-      pixelRatio: 3,
+      pixelRatio: 2,
       backgroundColor: "#ffffff",
       cacheBust: true,
       skipFonts: false,
+      skipAutoScale: true,
       includeQueryParams: true,
     });
   } finally {
@@ -158,7 +167,7 @@ async function exportPng() {
     link.download = `ticketmaster-stub-${Date.now()}.png`;
     link.href = dataUrl;
     link.click();
-    setStatus("PNG downloaded (3900x1767, 300dpi-equivalent).", "ok");
+    setStatus("PNG downloaded (2600×1178, print-ready).", "ok");
   } catch (e) {
     setStatus("PNG export failed: " + (e?.message || e), "err");
   }
@@ -170,12 +179,12 @@ async function exportSvg() {
     return;
   }
   setStatus("Loading fonts...", "working");
-  await waitForFonts();
-  const ctx = makeOffscreenClone(readForm());
+  await preloadStubFonts();
+  const ctx = createExportNode(readForm());
   if (!ctx) return;
   try {
     setStatus("Generating SVG...", "working");
-    const dataUrl = await window.htmlToImage.toSvg(ctx.clone, {
+    const dataUrl = await window.htmlToImage.toSvg(ctx.node, {
       width: 1300,
       height: 589,
       backgroundColor: "#ffffff",
