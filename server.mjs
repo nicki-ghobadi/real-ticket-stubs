@@ -140,12 +140,12 @@ const PRODUCTS = {
   mail: {
     name: "Printed ticket stub — mailed to you",
     description: "Thermal-style cardstock, perforated, shipped in 3–5 days.",
-    amount: 399, // $3.99
+    amount: 999, // $9.99
   },
   framed: {
     name: "Framed ticket stub for the wall",
     description: "Printed stub mounted in a nice frame, ready to hang.",
-    amount: 2999, // $29.99
+    amount: 3999, // $39.99
   },
 };
 

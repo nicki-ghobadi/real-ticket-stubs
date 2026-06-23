@@ -74,7 +74,7 @@ if (persistenceEnabled) {
       productName: "Printed ticket stub — mailed to you",
       cartJson: JSON.stringify([{ product: "mail", quantity: 1 }]),
       cartItems: [{ product: "mail", quantity: 1 }],
-      amountTotal: 399,
+      amountTotal: 999,
       currency: "usd",
       shipping: {
         name: "Test Customer",

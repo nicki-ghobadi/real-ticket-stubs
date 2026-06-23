@@ -11,7 +11,7 @@ Turn a **mobile ticket screenshot** into a **print-ready Ticketmaster-style ther
 - **Edit** — All stub fields: artist, venue, date, section, row, seat, barcode, etc.
 - **Preview** — Vector Ticketmaster layout (1300×589) with perforation lines
 - **Export** — Print, high-res PNG (3×), or SVG
-- **Checkout** — Three options: **print at home (free)**, **mail a printed stub ($3.99)**, or a **framed stub for the wall ($29.99)**
+- **Checkout** — Three options: **print at home (free)**, **mail a printed stub ($9.99)**, or a **framed stub for the wall ($39.99)**
 - **Payments** — Real **Stripe-hosted Checkout** (falls back to mock mode if no key is set)
 - **Address verification** — Email confirm + MX check + US/Canada postal validation before payment
 
@@ -55,8 +55,8 @@ Creates **`real-ticket-stubs`** on your account and pushes `main`. Use `./script
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Recommended | Server-side Claude vision extract (`/api/extract`). Never exposed to the browser. Get it at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). |
 | `ANTHROPIC_VISION_MODEL` | No | Default `claude-sonnet-4-6` |
-| `STRIPE_PAYMENT_LINK_MAIL` | Recommended | Payment Link URL for mailed stub ($3.99). Set in `.env`, not in source code. |
-| `STRIPE_PAYMENT_LINK_FRAMED` | Recommended | Payment Link URL for framed stub ($29.99). Set in `.env`, not in source code. |
+| `STRIPE_PAYMENT_LINK_MAIL` | Recommended | Payment Link URL for mailed stub ($9.99). Set in `.env`, not in source code. |
+| `STRIPE_PAYMENT_LINK_FRAMED` | Recommended | Payment Link URL for framed stub ($39.99). Set in `.env`, not in source code. |
 | `STRIPE_SECRET_KEY` | Optional | API Checkout fallback + webhook session retrieval. Not needed if using Payment Links only. |
 | `STRIPE_WEBHOOK_SECRET` | Before fulfillment | `whsec_...` — verifies `/api/stripe/webhook`. Required before fulfilling paid orders. |
 | `NODE_ENV` | Prod | Set to `production` to enable HSTS and production defaults. |
@@ -83,7 +83,7 @@ flowchart LR
   C --> D[Preview stub]
   D --> E{Checkout}
   E -->|Print at home: free| F[Browser print]
-  E -->|Mail $3.99 / Framed $29.99| G[Validate address]
+  E -->|Mail $9.99 / Framed $39.99| G[Validate address]
   G --> H[Stripe Checkout]
   H --> I[Order confirmation]
 ```

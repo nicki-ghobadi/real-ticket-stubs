@@ -41,8 +41,8 @@ flowchart LR
 | Variable | Required | Value |
 |----------|----------|-------|
 | `ANTHROPIC_API_KEY` | Yes (for AI extract) | `sk-ant-...` from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) |
-| `STRIPE_PAYMENT_LINK_MAIL` | Yes (Payment Links) | `https://buy.stripe.com/...` for $3.99 mailed stub |
-| `STRIPE_PAYMENT_LINK_FRAMED` | Yes (Payment Links) | `https://buy.stripe.com/...` for $29.99 framed stub |
+| `STRIPE_PAYMENT_LINK_MAIL` | Yes (Payment Links) | `https://buy.stripe.com/...` for $9.99 mailed stub |
+| `STRIPE_PAYMENT_LINK_FRAMED` | Yes (Payment Links) | `https://buy.stripe.com/...` for $39.99 framed stub |
 | `STRIPE_WEBHOOK_SECRET` | Yes (before fulfilling orders) | `whsec_...` (Step 4) |
 | `STRIPE_SECRET_KEY` | Recommended | Needed for the webhook to retrieve full order details (and API Checkout fallback) |
 | `SUPABASE_URL` | Yes (to store orders) | Project URL, e.g. `https://abc.supabase.co` |

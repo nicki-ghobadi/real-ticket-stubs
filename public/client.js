@@ -743,14 +743,14 @@ const PRODUCTS = {
   mail: {
     label: "Printed stub — mailed",
     shortLabel: "Mailed stub",
-    price: 3.99,
-    amount: 399,
+    price: 9.99,
+    amount: 999,
   },
   framed: {
     label: "Framed stub for the wall",
     shortLabel: "Framed stub",
-    price: 29.99,
-    amount: 2999,
+    price: 39.99,
+    amount: 3999,
   },
 };
 const money = (n) => `$${Number(n).toFixed(2)}`;

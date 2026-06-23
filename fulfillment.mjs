@@ -113,7 +113,7 @@ const PRODUCT_LABELS = {
   mail: "Printed stub — mailed",
   framed: "Framed stub for the wall",
 };
-const PRODUCT_CENTS = { mail: 399, framed: 2999 };
+const PRODUCT_CENTS = { mail: 999, framed: 3999 };
 
 function cartLineItems(order) {
   return (order.cartItems || [])
