@@ -101,6 +101,12 @@ try {
     else fail(`GET ${page}`, `status ${p.res.status}`);
   }
 
+  for (const asset of ["/favicon.svg", "/og-image.jpg", "/apple-touch-icon.png"]) {
+    const a = await get(asset);
+    if (a.res.status === 200) ok(`GET ${asset}`);
+    else fail(`GET ${asset}`, `status ${a.res.status}`);
+  }
+
   const blocked = await get("/server.mjs");
   if (blocked.res.status === 404) ok("server.mjs not exposed");
   else fail("server.mjs not exposed", `got ${blocked.res.status}`);

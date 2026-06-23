@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Real Ticket Stubs">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#cfe1f1"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Mini ticket stub -->
+  <g transform="translate(8 18)">
+    <rect x="0" y="0" width="48" height="28" rx="2" fill="#fff" stroke="#2360a8" stroke-width="1.5"/>
+    <line x1="12" y1="0" x2="12" y2="28" stroke="#2360a8" stroke-width="1" stroke-dasharray="2 2"/>
+    <rect x="0" y="0" width="12" height="6" fill="#2360a8"/>
+    <rect x="12" y="0" width="36" height="6" fill="#a8c4df"/>
+    <text x="6" y="4.5" font-family="Arial,sans-serif" font-size="3.5" font-weight="700" fill="#fff" text-anchor="middle">TKT</text>
+    <text x="30" y="17" font-family="Arial Black,Arial,sans-serif" font-size="5" font-weight="900" fill="#194279" text-anchor="middle">RTS</text>
+    <!-- Barcode stripes -->
+    <g fill="#060606">
+      <rect x="40" y="8" width="1" height="14"/>
+      <rect x="42" y="8" width="1.5" height="14"/>
+      <rect x="44.5" y="8" width="1" height="14"/>
+      <rect x="46.5" y="8" width="2" height="14"/>
+      <rect x="49" y="8" width="1" height="14"/>
+    </g>
+  </g>
+</svg>

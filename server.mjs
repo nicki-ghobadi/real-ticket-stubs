@@ -621,6 +621,9 @@ const PUBLIC_FILES = new Map([
   ["/terms.html", "terms.html"],
   ["/privacy.html", "privacy.html"],
   ["/refunds.html", "refunds.html"],
+  ["/favicon.svg", "favicon.svg"],
+  ["/og-image.jpg", "og-image.jpg"],
+  ["/apple-touch-icon.png", "apple-touch-icon.png"],
 ]);
 
 /** Process a paid checkout: capture address, verify deliverability, fulfill.
