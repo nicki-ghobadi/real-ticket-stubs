@@ -7,7 +7,7 @@
  */
 import "../load-env.mjs";
 import { minStubPngDataUrl } from "./png-fixture.mjs";
-import { normalizeExtractedFields, prepareTicketData } from "../public/templates.js";
+import { normalizeExtractedFields, prepareTicketData, parseSeatList, expandTicketsForSeating, resolveSeatingSlots } from "../public/templates.js";
 import { validateShippingFormat } from "../public/shipping-validation.js";
 
 const base = (process.argv.find((a) => a.startsWith("--base="))?.split("=")[1]
@@ -67,6 +67,25 @@ const normalized = normalizeExtractedFields({
 });
 if (normalized.section === "117" && normalized.row === "14") ok("normalizeExtractedFields");
 else fail("normalizeExtractedFields", JSON.stringify(normalized));
+
+const multiNorm = normalizeExtractedFields({
+  seating: [
+    { section: "117", row: "14", seat: "1" },
+    { section: "117", row: "14", seat: "2" },
+  ],
+});
+if (Array.isArray(multiNorm.seating) && multiNorm.seating.length === 2) ok("normalizeExtractedFields seating array");
+else fail("normalizeExtractedFields seating array", JSON.stringify(multiNorm.seating));
+
+if (parseSeatList("1-4").join(",") === "1,2,3,4") ok("parseSeatList range");
+else fail("parseSeatList range", parseSeatList("1-4"));
+
+const multiTickets = expandTicketsForSeating(
+  { section: "117", row: "14", seat: "1-3", eventLine2: "TEST" },
+  resolveSeatingSlots({ section: "117", row: "14", seat: "1-3" }),
+);
+if (multiTickets.length === 3 && multiTickets[2].seat === "3") ok("expandTicketsForSeating");
+else fail("expandTicketsForSeating", JSON.stringify(multiTickets.map((t) => t.seat)));
 
 const ticket = prepareTicketData({ section: "117", row: "14", seat: "1", eventLine2: "TEST" });
 if (ticket.barcode && /^\d{10,}$/.test(ticket.barcode)) ok("prepareTicketData barcode fallback");

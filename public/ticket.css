@@ -1,4 +1,4 @@
-/* Vector Ticketmaster stub — designed at 1300×589 (4.33in × 1.96in @ 300dpi).
+/* Vector Ticketmaster stub — designed at 1650×525 (5.50in × 1.75in @ 300dpi).
    Pure HTML/CSS/SVG, no raster image; safe for high-quality print. */
 
 /* Force any monospace value to render in bold-thermal weight; OCR-A Std only
@@ -9,8 +9,8 @@
 }
 
 .tm {
-  --tm-w: 1300px;
-  --tm-h: 589px;
+  --tm-w: 1650px;
+  --tm-h: 525px;
 
   --tm-blue: #2360a8;
   --tm-blue-dark: #194279;
@@ -46,8 +46,8 @@
 
 /* ── perforations ──
    Two dashed cut-lines that match a real Ticketmaster thermal stub:
-     LEFT  → between the venue stub (0–208) and the center body (208–920)
-     RIGHT → between the center body (208–920) and the customer stub (920–1300)
+     LEFT  → between the venue stub (0–264) and the center body (264–1168)
+     RIGHT → between the center body (264–1168) and the customer stub (1168–1650)
    Drawn with a dark dashed border so the printer always lays down ink. */
 .tm-perf {
   position: absolute;
@@ -62,19 +62,19 @@
 }
 
 .tm-perf-left {
-  left: 208px;
+  left: 264px;
 }
 
 .tm-perf-right {
-  left: 920px;
+  left: 1168px;
 }
 
-/* ───── LEFT STUB (0–208) ───── */
+/* ───── LEFT STUB (0–264) ───── */
 .tm-left {
   position: absolute;
   left: 0;
   top: 0;
-  width: 208px;
+  width: 264px;
   height: 100%;
   background: var(--tm-blue-tint);
 }
@@ -84,43 +84,43 @@
   left: 0;
   top: 0;
   width: 100%;
-  height: 48px;
-  padding: 10px 14px;
+  height: 43px;
+  padding: 9px 18px;
   background: var(--tm-blue-hdr);
-  font-size: 30px;
+  font-size: 27px;
   font-weight: 700;
 }
 
 .tm-left-toplbl {
   position: absolute;
   left: 0;
-  top: 48px;
+  top: 43px;
   width: 100%;
-  height: 22px;
-  padding: 5px 14px;
+  height: 20px;
+  padding: 4px 18px;
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .tm-left-price {
   position: absolute;
-  left: 14px;
-  top: 84px;
-  font-size: 38px;
+  left: 18px;
+  top: 75px;
+  font-size: 34px;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
 
 .tm-left-cc {
   position: absolute;
-  left: 14px;
-  top: 130px;
+  left: 18px;
+  top: 116px;
   font-family: var(--tm-label);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   color: #444;
   letter-spacing: 0.04em;
@@ -128,33 +128,33 @@
 
 .tm-left-cc-sym {
   position: absolute;
-  left: 14px;
-  top: 146px;
-  font-size: 18px;
+  left: 18px;
+  top: 130px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .tm-left-seclbl {
   position: absolute;
   left: 0;
-  top: 180px;
+  top: 160px;
   width: 100%;
-  height: 20px;
-  padding: 4px 14px;
+  height: 18px;
+  padding: 4px 18px;
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .tm-left-sec {
   position: absolute;
-  left: 14px;
-  top: 212px;
-  max-width: 180px;
-  font-size: 42px;
+  left: 18px;
+  top: 189px;
+  max-width: 228px;
+  font-size: 37px;
   font-weight: 700;
   line-height: 1;
   overflow: hidden;
@@ -164,9 +164,9 @@
 
 .tm-left-aux {
   position: absolute;
-  left: 14px;
-  top: 268px;
-  font-size: 26px;
+  left: 18px;
+  top: 239px;
+  font-size: 23px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -174,14 +174,14 @@
 .tm-left-rowlbl {
   position: absolute;
   left: 0;
-  top: 312px;
+  top: 278px;
   width: 60%;
-  height: 20px;
-  padding: 4px 14px;
+  height: 18px;
+  padding: 4px 18px;
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -189,71 +189,72 @@
 .tm-left-seatlbl {
   position: absolute;
   right: 0;
-  top: 312px;
+  top: 278px;
   width: 40%;
-  height: 20px;
-  padding: 4px 14px;
+  height: 18px;
+  padding: 4px 18px;
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .tm-left-row {
   position: absolute;
-  left: 18px;
-  top: 344px;
-  font-size: 40px;
+  left: 22px;
+  top: 307px;
+  font-size: 36px;
   font-weight: 700;
 }
 
 .tm-left-seat {
   position: absolute;
-  right: 32px;
-  top: 344px;
-  font-size: 40px;
+  right: 40px;
+  top: 307px;
+  font-size: 36px;
   font-weight: 700;
 }
 
 .tm-left-order {
   position: absolute;
-  left: 14px;
-  bottom: 56px;
-  font-size: 28px;
+  left: 18px;
+  bottom: 50px;
+  font-size: 25px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 .tm-left-date {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
-  font-size: 32px;
+  left: 18px;
+  bottom: 12px;
+  font-size: 29px;
   font-weight: 700;
 }
 
-/* ───── CENTER (208–920) ───── */
+/* ───── CENTER (264–1168) ───── */
 .tm-center {
   position: absolute;
-  left: 208px;
+  left: 264px;
   top: 0;
-  width: 712px;
+  width: 904px;
   height: 100%;
+  overflow: hidden;
 }
 
 .tm-head-vals {
   position: absolute;
   left: 0;
-  top: 10px;
+  top: 9px;
   width: 100%;
-  height: 36px;
-  padding: 0 22px;
+  height: 32px;
+  padding: 0 28px;
   display: grid;
-  grid-template-columns: 168px 110px 90px 168px 1fr;
+  grid-template-columns: 213px 140px 114px 213px 1fr;
   align-items: center;
-  font-size: 28px;
+  font-size: 25px;
   font-weight: 700;
   letter-spacing: 0.02em;
   overflow: hidden;
@@ -271,16 +272,16 @@
 .tm-head-lbls {
   position: absolute;
   left: 0;
-  top: 52px;
+  top: 46px;
   width: 100%;
-  height: 26px;
-  padding: 6px 22px;
+  height: 23px;
+  padding: 5px 28px;
   background: var(--tm-blue-hdr);
   display: grid;
-  grid-template-columns: 168px 110px 90px 168px 1fr;
+  grid-template-columns: 213px 140px 114px 213px 1fr;
   align-items: center;
   font-family: var(--tm-label);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -295,19 +296,19 @@
 .tm-sub {
   position: absolute;
   left: 0;
-  top: 88px;
+  top: 78px;
   width: 100%;
-  padding: 4px 22px;
-  height: 38px;
-  font-size: 26px;
+  padding: 4px 28px;
+  height: 34px;
+  font-size: 23px;
   font-weight: 700;
 }
 
 .tm-sub-aisle {
   position: absolute;
-  left: 22px;
-  top: 6px;
-  max-width: 340px;
+  left: 28px;
+  top: 5px;
+  max-width: 430px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -315,9 +316,9 @@
 
 .tm-sub-price {
   position: absolute;
-  left: 380px;
-  top: 6px;
-  max-width: 150px;
+  left: 482px;
+  top: 5px;
+  max-width: 190px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -325,9 +326,9 @@
 
 .tm-sub-evnum {
   position: absolute;
-  left: 548px;
-  top: 6px;
-  max-width: 140px;
+  left: 696px;
+  top: 5px;
+  max-width: 178px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -336,23 +337,23 @@
 .tm-event {
   position: absolute;
   left: 0;
-  top: 130px;
+  top: 116px;
   width: 100%;
-  height: calc(var(--tm-h) - 130px);
+  height: calc(var(--tm-h) - 116px);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 8px 24px 16px;
+  padding: 7px 30px 14px;
 }
 
 .tm-wm {
   position: absolute;
   left: 50%;
-  top: 80px;
+  top: 71px;
   transform: translate(-50%, 0) rotate(-8deg);
   font-family: var(--tm-brand);
-  font-size: 110px;
+  font-size: 72px;
   font-weight: 700;
   font-style: italic;
   color: rgba(120, 160, 200, 0.20);
@@ -362,6 +363,7 @@
   z-index: 0;
   letter-spacing: -0.03em;
   text-transform: lowercase;
+  max-width: 860px;
 }
 
 .tm-promo,
@@ -375,51 +377,51 @@
 }
 
 .tm-promo {
-  margin-top: 6px;
-  font-size: 28px;
+  margin-top: 5px;
+  font-size: 25px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .tm-artist {
-  margin-top: 10px;
+  margin-top: 9px;
   font-family: var(--tm-artist);
-  font-size: 70px;
+  font-size: 62px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.02em;
-  max-width: 664px;
+  max-width: 844px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tm-artist.tm-artist-med {
-  font-size: 54px;
+  font-size: 48px;
 }
 
 .tm-artist.tm-artist-long {
-  font-size: 42px;
+  font-size: 37px;
   letter-spacing: 0.01em;
 }
 
 .tm-tour {
-  margin-top: 14px;
-  font-size: 32px;
+  margin-top: 12px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  max-width: 664px;
+  max-width: 844px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tm-venue {
-  margin-top: 12px;
-  font-size: 32px;
+  margin-top: 11px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: 0.03em;
-  max-width: 664px;
+  max-width: 844px;
   line-height: 1.15;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -428,104 +430,120 @@
 }
 
 .tm-venue.tm-venue-long {
-  font-size: 26px;
+  font-size: 23px;
 }
 
 .tm-disclaim {
-  margin-top: 14px;
-  font-size: 26px;
+  margin-top: 12px;
+  font-size: 23px;
   font-weight: 700;
   letter-spacing: 0.03em;
-  max-width: 664px;
+  max-width: 844px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .tm-datetime {
-  margin-top: 16px;
-  font-size: 34px;
+  margin-top: 14px;
+  font-size: 30px;
   font-weight: 700;
   letter-spacing: 0.03em;
-  max-width: 664px;
+  max-width: 844px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ───── RIGHT STUB (920–1300, 380px wide) ─────
-   Layout (from left edge of stub):
-     0–180  : data column (codes / SEC ROW SEAT tags + values)
-     180–250: barcode column (vertical CODE128)
-     250–330: vertical Ticketmaster wordmark + yellow swoosh + URL
-     330–380: legal fine print
-*/
+/* ───── RIGHT STUB (1168–1650, 482px wide) ─────
+   Columns (no overlap):
+     0–208   tm-r-data  — event code, SEC/ROW/SEAT grid (clipped)
+     208–430 tm-r-tail  — barcode + "ticketmaster style" (vertically centered)
+     430–482 tm-legal   — rights line */
 .tm-right {
   position: absolute;
-  left: 920px;
+  left: 1168px;
   top: 0;
-  width: 380px;
+  width: 482px;
   height: 100%;
   background: var(--tm-blue-tint);
+  overflow: hidden;
+}
+
+/* Left data block — stays clear of barcode column. */
+.tm-r-data {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 208px;
+  height: 100%;
+  overflow: hidden;
+  z-index: 2;
 }
 
 .tm-r-top {
   position: absolute;
   left: 0;
   top: 0;
-  width: 175px;
-  height: 48px;
-  padding: 8px 14px;
+  width: 100%;
+  height: 43px;
+  padding: 7px 12px;
   background: var(--tm-blue-hdr);
-  font-size: 30px;
+  font-size: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-r-toplbl {
   position: absolute;
   left: 0;
-  top: 48px;
-  width: 175px;
-  height: 24px;
-  padding: 6px 14px;
+  top: 43px;
+  width: 100%;
+  height: 21px;
+  padding: 5px 12px;
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .tm-r-evnum {
   position: absolute;
-  left: 14px;
-  top: 86px;
-  font-size: 30px;
+  left: 12px;
+  top: 77px;
+  max-width: 184px;
+  font-size: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tm-r-cn {
   position: absolute;
-  left: 14px;
-  top: 140px;
-  font-size: 30px;
+  left: 12px;
+  top: 118px;
+  max-width: 184px;
+  font-size: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* SEC / ROW / SEAT mini-grid on right stub.
-   3-column grid: [blue tag] [big value] [aux text].
-     row 1: SEC. | FLR 3   | —
-     row 2: ROW  | 14      | CA404SJA   (auxRight)
-     row 3: —    | —       | V 180.00   (priceRight, between ROW and SEAT)
-     row 4: SEAT | [1]     | — */
 .tm-r-grid {
   position: absolute;
-  left: 12px;
-  top: 188px;
+  left: 10px;
+  top: 162px;
   width: 188px;
   display: grid;
-  grid-template-columns: 46px 78px 1fr;
+  grid-template-columns: 48px 72px 1fr;
   grid-auto-rows: auto;
   align-items: center;
-  row-gap: 8px;
-  column-gap: 6px;
+  row-gap: 7px;
+  column-gap: 5px;
+  overflow: hidden;
 }
 
 .tm-r-grid > * {
@@ -537,9 +555,9 @@
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 4px 6px;
+  padding: 3px 5px;
   text-align: center;
   letter-spacing: 0.04em;
   align-self: center;
@@ -548,7 +566,7 @@
 }
 
 .tm-r-val {
-  font-size: 30px;
+  font-size: 24px;
   align-self: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -557,7 +575,7 @@
 }
 
 .tm-r-side {
-  font-size: 19px;
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.01em;
   align-self: end;
@@ -572,120 +590,149 @@
   display: inline-block;
   background: var(--tm-blue);
   color: #fff;
-  padding: 2px 12px;
-  font-size: 28px;
+  padding: 2px 10px;
+  font-size: 22px;
   width: fit-content;
 }
 
-/* Barcode column — vertical bars + printed digits beside them. */
-.tm-scan {
+/* Barcode + brand — full-height barcode; wordmark vertically centered beside it. */
+.tm-r-tail {
   position: absolute;
-  left: 205px;
-  top: 18px;
-  width: 70px;
-  height: 540px;
+  left: 212px;
+  right: 32px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  z-index: 1;
+}
+
+.tm-scan {
+  align-self: stretch;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 10px 0;
+  flex-shrink: 0;
+}
+
+.tm-barcode-wrap {
+  container-type: size;
+  width: 48px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .tm-barcode {
-  position: absolute;
-  left: 6px;
-  top: 8px;
   width: 48px;
-  height: 470px;
+  height: 100%;
+  max-width: none;
   display: block;
+  transform: none;
+  flex-shrink: 0;
+}
+
+.tm-barcode.tm-barcode--live {
+  width: 100cqh;
+  height: 48px;
+  transform: rotate(90deg);
+  transform-origin: center center;
+}
+
+@supports not (width: 1cqh) {
+  .tm-barcode.tm-barcode--live {
+    width: 490px;
+    height: 48px;
+  }
 }
 
 .tm-barcode-num {
-  position: absolute;
-  left: 58px;
-  top: 30px;
   writing-mode: vertical-rl;
+  text-orientation: mixed;
   transform: rotate(180deg);
   font-family: var(--tm-mono);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.1em;
   color: #000;
-  height: 430px;
+  white-space: nowrap;
+  line-height: 1;
+  flex-shrink: 0;
+  align-self: center;
 }
 
-/* Brand strip (far right) */
-/* Brand block — vertical wordmark, swoosh, URL, fine print stacked from
-   x≈282 (just right of barcode column) to the right edge. */
 .tm-brand {
-  position: absolute;
-  left: 282px;
-  top: 0;
-  width: 98px;
-  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 380px;
 }
 
-/* Vertical Ticketmaster wordmark. writing-mode: sideways-lr renders text so
-   you tilt your head LEFT to read — matching the reference photo. */
+.tm-logo-wrap {
+  width: 36px;
+  height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
 .tm-logo {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 56px;
-  writing-mode: sideways-lr;
+  display: inline-block;
+  white-space: nowrap;
+  word-break: keep-all;
+  transform: rotate(-90deg);
+  transform-origin: center center;
   font-family: var(--tm-brand);
-  font-size: 44px;
+  font-size: 24px;
   font-weight: 700;
   font-style: italic;
   color: var(--tm-blue-dark);
-  letter-spacing: -0.035em;
+  letter-spacing: 0.005em;
   line-height: 1;
-  text-align: center;
-  padding: 16px 0;
-  box-sizing: border-box;
   text-transform: lowercase;
 }
 
 .tm-swoosh {
-  position: absolute;
-  left: 56px;
-  top: 80px;
   width: 6px;
-  height: 380px;
+  height: 344px;
   background: var(--tm-yellow);
-}
-
-.tm-brand-url {
-  position: absolute;
-  left: 62px;
-  top: 0;
-  bottom: 0;
-  width: 22px;
-  writing-mode: sideways-lr;
-  font-family: var(--tm-brand);
-  font-size: 16px;
-  font-weight: 700;
-  font-style: italic;
-  color: var(--tm-blue-dark);
-  letter-spacing: 0.015em;
-  line-height: 1.25;
-  text-align: center;
-  padding: 70px 0;
-  box-sizing: border-box;
-  text-transform: lowercase;
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .tm-legal {
   position: absolute;
   right: 6px;
-  top: 0;
-  bottom: 0;
-  width: 18px;
-  writing-mode: sideways-lr;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
   font-family: var(--tm-label);
   font-size: 9px;
   font-weight: 700;
   line-height: 1.2;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   color: var(--tm-ink);
   text-align: center;
-  padding: 22px 0;
+  text-transform: none;
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -694,8 +741,8 @@
   position: fixed;
   left: -99999px;
   top: 0;
-  width: 1300px;
-  height: 589px;
+  width: 1650px;
+  height: 525px;
   overflow: hidden;
   background: #fff;
   z-index: -1;
@@ -705,15 +752,34 @@
 .stub-export-host .tm {
   position: relative;
   transform: none !important;
-  width: 1300px;
-  height: 589px;
+  width: 1650px;
+  height: 525px;
 }
 
 /* Preview scaling — fluid width via container queries (phones → laptops). */
+.stub-stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 2vw, 1.25rem);
+  width: 100%;
+}
+
+.stub-ticket-label {
+  margin: 0 0 0.35rem;
+  font-family: var(--tm-label, Arial, Helvetica, sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #dbeafe;
+  text-align: center;
+}
+
 .stub-preview-wrap {
   display: flex;
   justify-content: center;
   width: 100%;
+  min-width: 0;
   padding: clamp(0.5rem, 2vw, 1rem) clamp(0.35rem, 1.5vw, 0.5rem);
   background: #2a2630;
   border-radius: 10px;
@@ -721,46 +787,26 @@
 }
 
 .stub-stage {
-  container-type: inline-size;
   width: 100%;
-  max-width: 1300px;
-  aspect-ratio: 1300 / 589;
+  max-width: 1650px;
+  aspect-ratio: 1650 / 525;
   position: relative;
   overflow: hidden;
   background: #fff;
   border-radius: 6px;
   border: 1px solid var(--border, #a8c4df);
   margin: 0 auto;
+  flex-shrink: 0;
 }
 
 .stub-stage .tm {
   position: absolute;
   top: 0;
   left: 0;
-  width: 1300px;
-  height: 589px;
+  width: 1650px;
+  height: 525px;
   transform-origin: top left;
-  transform: scale(calc(100cqw / 1300));
-}
-
-/* Fallback when container queries are unavailable */
-@supports not (transform: scale(calc(100cqw / 1300))) {
-  .stub-stage {
-    width: min(100%, 975px);
-    height: calc(min(100%, 975px) * 589 / 1300);
-  }
-  .stub-stage .tm {
-    transform: scale(0.75);
-  }
-  @media (max-width: 760px) {
-    .stub-stage {
-      width: min(100%, 520px);
-      height: calc(min(100%, 520px) * 589 / 1300);
-    }
-    .stub-stage .tm {
-      transform: scale(0.4);
-    }
-  }
+  /* transform scale set in JS (fitStubPreviewScales) to match container width */
 }
 
 .tm,
@@ -785,17 +831,34 @@
     background: #fff;
     border-radius: 0;
   }
+  .stub-stack {
+    gap: 0;
+  }
+  .stub-ticket-label {
+    visibility: hidden;
+    height: 0;
+    margin: 0;
+    overflow: hidden;
+  }
   .stub-stage {
-    width: 1300px;
-    height: 589px;
+    width: 1650px;
+    height: 525px;
     border: 0;
     overflow: visible;
+    page-break-after: always;
+    break-after: page;
+  }
+  .stub-stack .stub-stage:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
   .stub-stage .tm {
     transform: none !important;
+    width: 1650px;
+    height: 525px;
   }
   @page {
-    size: 4.33in 1.96in;
+    size: 5.5in 1.75in;
     margin: 0;
   }
 }

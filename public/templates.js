@@ -1,5 +1,12 @@
 /** Stub HTML/CSS generation. @see TODO.md — server-side PDF export for fulfillment. */
 
+/** Print canvas @ 300 dpi — 5.50″ wide × 1.75″ tall thermal stub. */
+export const STUB_DPI = 300;
+export const STUB_WIDTH_IN = 5.5;
+export const STUB_HEIGHT_IN = 1.75;
+export const STUB_WIDTH = Math.round(STUB_WIDTH_IN * STUB_DPI);
+export const STUB_HEIGHT = Math.round(STUB_HEIGHT_IN * STUB_DPI);
+
 function upper(s) {
   return String(s ?? "").toUpperCase().trim();
 }
@@ -109,6 +116,18 @@ export function normalizeExtractedFields(raw) {
     for (const [rawKey, rawVal] of Object.entries(source)) {
       if (rawKey.startsWith("_")) continue;
 
+      if (compactKey(rawKey) === "seating" && Array.isArray(rawVal)) {
+        out.seating = rawVal
+          .filter((row) => row && typeof row === "object")
+          .map((row) => ({
+            section: upper(row.section),
+            row: upper(row.row),
+            seat: upper(row.seat),
+          }))
+          .filter((row) => row.seat);
+        continue;
+      }
+
       // Flatten one-level nests: { seating: { section: "117" } }
       if (rawVal && typeof rawVal === "object" && !Array.isArray(rawVal)) {
         for (const [subKey, subVal] of Object.entries(rawVal)) {
@@ -124,6 +143,95 @@ export function normalizeExtractedFields(raw) {
   }
 
   return out;
+}
+
+/** Parse one seat value, a comma list, or a numeric range into seat strings. */
+export function parseSeatList(raw) {
+  const s = String(raw ?? "").trim().toUpperCase();
+  if (!s) return [];
+
+  const range = s.match(
+    /^(\d{1,4}[A-Z]?)\s*(?:-|–|—|\.\.|TO|THROUGH)\s*(\d{1,4}[A-Z]?)$/i,
+  );
+  if (range) {
+    const startNum = parseInt(range[1], 10);
+    const endNum = parseInt(range[2], 10);
+    if (!Number.isNaN(startNum) && !Number.isNaN(endNum) && endNum >= startNum) {
+      const span = endNum - startNum + 1;
+      if (span <= 32) {
+        return Array.from({ length: span }, (_, i) => String(startNum + i));
+      }
+    }
+  }
+
+  const listParts = s.split(/[\s,/&+]+/).filter(Boolean);
+  const listed = listParts.filter((part) => /^\d{1,4}[A-Z]?$/.test(part));
+  if (listed.length > 1) return listed;
+
+  if (/^\d{1,4}[A-Z]?$/.test(s)) return [s];
+  return [];
+}
+
+/** Build unique seating slots from extracted data or the seat form field. */
+export function resolveSeatingSlots(fields) {
+  const base = fields || {};
+  const explicit = Array.isArray(base.seating)
+    ? base.seating
+        .map((row) => ({
+          section: upper(row?.section || base.section),
+          row: upper(row?.row || base.row),
+          seat: upper(row?.seat),
+        }))
+        .filter((row) => row.seat)
+    : [];
+
+  const unique = [];
+  const seen = new Set();
+  const push = (row) => {
+    const key = `${row.section}|${row.row}|${row.seat}`;
+    if (!row.seat || seen.has(key)) return;
+    seen.add(key);
+    unique.push(row);
+  };
+
+  if (explicit.length) {
+    explicit.forEach(push);
+    return unique;
+  }
+
+  const seats = parseSeatList(base.seat);
+  if (seats.length > 1) {
+    seats.forEach((seat) => push({
+      section: upper(base.section),
+      row: upper(base.row),
+      seat: upper(seat),
+    }));
+    return unique;
+  }
+
+  if (base.seat || base.section || base.row) {
+    push({
+      section: upper(base.section),
+      row: upper(base.row),
+      seat: upper(base.seat),
+    });
+  }
+
+  return unique.length ? unique : [{ section: "", row: "", seat: "" }];
+}
+
+/** One complete form field map per seat — shared event info, unique row/seat. */
+export function expandTicketsForSeating(baseFields, seatingSlots) {
+  const base = { ...(baseFields || {}) };
+  delete base.seating;
+  const slots = seatingSlots?.length ? seatingSlots : resolveSeatingSlots(base);
+
+  return slots.map((slot) => ({
+    ...base,
+    section: slot.section || base.section || "",
+    row: slot.row || base.row || "",
+    seat: slot.seat || base.seat || "",
+  }));
 }
 
 export function defaultFields() {
@@ -291,6 +399,8 @@ export function prepareTicketData(raw) {
     datetime,
     dateShort: pick(f.dateShort, shortDate(datetime)),
     barcode: barcodeRaw || numericBarcode(seed, 13),
+    /** Vertical barcode on the right stub — always the order / confirmation code. */
+    barcodeScan: orderCode,
   };
 }
 
@@ -298,19 +408,19 @@ export function prepareTicketData(raw) {
 // derived deterministically from the input. The actual digits are printed
 // beneath, so this is for visual fidelity, not machine scanning.
 function renderBarcodeSvg(value) {
-  const raw = String(value || "0000000000000").replace(/\D/g, "") || "6540422223612";
-  // Derive stripe heights from input digits.
+  const raw = String(value || "404VSJA").toUpperCase().replace(/[^A-Z0-9]/g, "") || "404VSJA";
+  // Derive stripe heights from each character (order code may be alphanumeric).
   let heights = [];
   for (let i = 0; i < raw.length; i++) {
-    const d = parseInt(raw[i], 10);
-    heights.push(1 + (d % 4));
-    heights.push(1 + ((d * 7 + i) % 3));
+    const code = raw.charCodeAt(i);
+    heights.push(1 + (code % 4));
+    heights.push(1 + ((code * 7 + i) % 3));
   }
   while (heights.length < 60) heights.push(1 + (heights.length % 3));
 
   // Vertical barcode: stripes run horizontally (full width), stacked top-to-bottom.
   const viewW = 54;
-  const viewH = 470;
+  const viewH = 490;
   let y = 4;
   const rects = [];
   for (let i = 0; i < heights.length && y < viewH - 4; i++) {
@@ -369,7 +479,7 @@ export function buildTicketHtml(d) {
   parts.push(`<span class="tm-sub-evnum">${esc(d.eventNum)}</span>`);
   parts.push('</div>');
   parts.push('<div class="tm-event">');
-  parts.push('<div class="tm-wm" aria-hidden="true">ticketmaster</div>');
+  parts.push('<div class="tm-wm" aria-hidden="true">ticketmaster style</div>');
   parts.push(`<p class="tm-promo">${esc(d.promo)}</p>`);
   parts.push(`<p class="tm-artist${d.artistClass ? " " + d.artistClass : ""}">${esc(d.artist)}</p>`);
   parts.push(`<p class="tm-tour">${esc(d.tour)}</p>`);
@@ -382,31 +492,31 @@ export function buildTicketHtml(d) {
   // Right perforation + stub
   parts.push('<div class="tm-perf tm-perf-right" aria-hidden="true"></div>');
   parts.push('<aside class="tm-right">');
+  parts.push('<div class="tm-r-data">');
   parts.push(`<div class="tm-r-top">${esc(d.headerRight)}</div>`);
   parts.push('<div class="tm-r-toplbl">EVENT CODE</div>');
   parts.push(`<div class="tm-r-evnum">${esc(d.eventNum)}</div>`);
   parts.push(`<div class="tm-r-cn">${esc(d.cn)}</div>`);
-  // Mini grid: 3 columns [blue tag | big value | aux text].
-  //   SEC.  FLR 3   —
-  //   ROW   14      CA404SJA   (auxRight, same horizontal line as ROW)
-  //                 V 180.00   (priceRight, between ROW and SEAT rows)
-  //   SEAT  [1]     —
   parts.push('<div class="tm-r-grid">');
   parts.push(`<span class="tm-r-tag">SEC.</span><span class="tm-r-val">${esc(d.section)}</span><span></span>`);
   parts.push(`<span class="tm-r-tag">ROW</span><span class="tm-r-val">${esc(d.row)}</span><span class="tm-r-side">${esc(d.auxRight)}</span>`);
   parts.push(`<span></span><span></span><span class="tm-r-side">${esc(d.priceRight)}</span>`);
   parts.push(`<span class="tm-r-tag">SEAT</span><span class="tm-r-val tm-r-seat-box">${esc(d.seat)}</span><span></span>`);
   parts.push('</div>');
+  parts.push('</div>');
+  parts.push('<div class="tm-r-tail">');
   parts.push('<div class="tm-scan">');
-  parts.push(renderBarcodeSvg(d.barcode));
-  parts.push(`<span class="tm-barcode-num">${esc(d.barcode)}</span>`);
+  parts.push('<div class="tm-barcode-wrap">');
+  parts.push(renderBarcodeSvg(d.barcodeScan));
+  parts.push('</div>');
+  parts.push(`<span class="tm-barcode-num">${esc(d.barcodeScan)}</span>`);
   parts.push('</div>');
   parts.push('<div class="tm-brand" aria-hidden="true">');
-  parts.push('<span class="tm-logo">ticketmaster</span>');
+  parts.push('<span class="tm-logo-wrap"><span class="tm-logo">ticketmaster&nbsp;style</span></span>');
   parts.push('<span class="tm-swoosh"></span>');
-  parts.push('<span class="tm-brand-url">get tickets at ticketmaster.com</span>');
   parts.push('</div>');
-  parts.push('<p class="tm-legal">NO EXCHANGE EXCEPT AS PROVIDED HEREIN. NO REFUNDS. NO REENTRY.</p>');
+  parts.push('</div>');
+  parts.push('<p class="tm-legal">All rights reserved for realticketstubs.com</p>');
   parts.push('</aside>');
 
   parts.push('</article>');

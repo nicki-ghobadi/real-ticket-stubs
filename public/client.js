@@ -7,6 +7,10 @@ import {
   normalizeExtractedFields,
   prepareTicketData,
   buildTicketHtml,
+  expandTicketsForSeating,
+  resolveSeatingSlots,
+  STUB_WIDTH,
+  STUB_HEIGHT,
 } from "./templates.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -26,7 +30,36 @@ const api = (path) => `${API_BASE}${path}`;
 const state = {
   imageDataUrl: null,
   fields: defaultFields(),
+  /** When vision/OCR finds multiple ticket cards, cache full section/row/seat tuples. */
+  seating: null,
+  /** True until the user uploads/extracts their own ticket. */
+  demoMode: true,
 };
+
+/** Load the built-in Coldplay example into the preview (stub layout only — no upload). */
+function loadDemoExample() {
+  state.fields = defaultFields();
+  state.seating = null;
+  state.imageDataUrl = null;
+  state.demoMode = true;
+
+  const fileInput = $("#file-input");
+  if (fileInput) fileInput.value = "";
+
+  $("#source-preview-wrap")?.classList.add("hidden");
+  const preview = $("#source-preview");
+  if (preview) preview.removeAttribute("src");
+
+  const extractBtn = $("#extract-btn");
+  if (extractBtn) extractBtn.disabled = true;
+
+  $("#edit-panel")?.classList.add("hidden");
+
+  if (form) form.reset();
+  fillForm(state.fields);
+  renderStub(state.fields);
+  setStatus("", "");
+}
 
 function setStatus(msg, kind = "") {
   const el = $("#status");
@@ -61,23 +94,102 @@ function drawBarcode(svg, barcode) {
   try {
     JsBarcode(svg, barcode, {
       format: "CODE128",
-      width: 1.8,
-      height: 48,
+      width: 1.35,
+      height: 40,
       displayValue: false,
       margin: 0,
       background: "transparent",
       lineColor: "#000000",
     });
+    svg.classList.add("tm-barcode--live");
+    svg.style.removeProperty("transform");
+    svg.removeAttribute("width");
+    svg.removeAttribute("height");
+    svg.setAttribute("preserveAspectRatio", "none");
   } catch (e) {
     console.warn("JsBarcode skipped:", e?.message || e);
   }
 }
 
-function renderStub(fields) {
+function getTicketVariants(fields) {
+  const base = { ...(fields || {}) };
+  if (state.seating?.length > 1) {
+    return expandTicketsForSeating(base, state.seating);
+  }
+  return expandTicketsForSeating(base, resolveSeatingSlots(base));
+}
+
+function mountTicketStub(stage, fields) {
   const d = prepareTicketData(fields);
-  const stage = $("#stub-stage");
   stage.innerHTML = buildTicketHtml(d);
-  drawBarcode(stage.querySelector(".tm-barcode"), d.barcode);
+  drawBarcode(stage.querySelector(".tm-barcode"), d.barcodeScan);
+}
+
+function renderStub(fields) {
+  const variants = getTicketVariants(fields);
+  const stack = $("#stub-stack");
+  if (!stack) return;
+
+  stack.innerHTML = variants
+    .map((variant, index) => {
+      const label =
+        variants.length > 1
+          ? `<p class="stub-ticket-label">Ticket ${index + 1} of ${variants.length} — Row ${variant.row || "?"} · Seat ${variant.seat || "?"}</p>`
+          : "";
+      return `${label}<div class="stub-stage" data-ticket-index="${index}"></div>`;
+    })
+    .join("");
+
+  variants.forEach((variant, index) => {
+    const stage = stack.querySelector(`[data-ticket-index="${index}"]`);
+    if (stage) mountTicketStub(stage, variant);
+  });
+
+  const heading = $("#output-heading");
+  const hint = $("#output-hint");
+  if (heading) {
+    heading.textContent =
+      variants.length > 1 ? `3. Print-ready stubs (${variants.length})` : "3. Print-ready stub";
+  }
+  if (hint && variants.length > 1) {
+    hint.textContent =
+      `${variants.length} tickets — one stub per seat (5.50″ × 1.75″ each). Print at 100% or save PNGs.`;
+  } else if (hint) {
+    hint.textContent =
+      "Exact print size: 5.50″ wide × 1.75″ tall (300 dpi). Print at 100% scale — do not fit to page.";
+  }
+
+  const printBtn = $("#print-btn");
+  const downloadBtn = $("#download-btn");
+  if (printBtn) printBtn.textContent = variants.length > 1 ? `Print ${variants.length} stubs` : "Print stub";
+  if (downloadBtn) {
+    downloadBtn.textContent =
+      variants.length > 1 ? `Download ${variants.length} PNGs (3x)` : "Download PNG (3x)";
+  }
+
+  fitStubPreviewScales();
+  requestAnimationFrame(() => fitStubPreviewScales());
+}
+
+/** Scale each preview stage so the full 1650×525 stub fits its container width. */
+function fitStubPreviewScales() {
+  document.querySelectorAll(".stub-stage").forEach((stage) => {
+    const tm = stage.querySelector(".tm");
+    if (!tm) return;
+    const scale = stage.clientWidth / STUB_WIDTH;
+    tm.style.transform = `scale(${scale})`;
+    tm.style.width = `${STUB_WIDTH}px`;
+    tm.style.height = `${STUB_HEIGHT}px`;
+  });
+}
+
+let stubPreviewResizeObserver;
+function initStubPreviewScaling() {
+  const stack = $("#stub-stack");
+  if (!stack || stubPreviewResizeObserver) return;
+  stubPreviewResizeObserver = new ResizeObserver(() => fitStubPreviewScales());
+  stubPreviewResizeObserver.observe(stack);
+  window.addEventListener("resize", fitStubPreviewScales);
 }
 
 /** Font sizes used on the stub — preload before PNG export so metrics match the preview. */
@@ -112,9 +224,34 @@ function createExportNode(fields) {
   host.innerHTML = buildTicketHtml(d);
   const node = host.querySelector(".tm");
   if (!node) return null;
-  drawBarcode(node.querySelector(".tm-barcode"), d.barcode);
+  drawBarcode(node.querySelector(".tm-barcode"), d.barcodeScan);
   document.body.appendChild(host);
   return { host, node };
+}
+
+async function exportStubPngDataUrl(fields) {
+  if (!window.htmlToImage) {
+    throw new Error("PNG renderer not loaded — check your network.");
+  }
+  await preloadStubFonts();
+  const ctx = createExportNode(fields);
+  if (!ctx) throw new Error("No stub to export — fill in your ticket details first.");
+  try {
+    await waitForPaint();
+    await waitForPaint();
+    return await window.htmlToImage.toPng(ctx.node, {
+      width: STUB_WIDTH,
+      height: STUB_HEIGHT,
+      pixelRatio: 2,
+      backgroundColor: "#ffffff",
+      cacheBust: true,
+      skipFonts: false,
+      skipAutoScale: true,
+      includeQueryParams: true,
+    });
+  } finally {
+    ctx.host.remove();
+  }
 }
 
 async function waitForFonts() {
@@ -132,42 +269,36 @@ async function waitForPaint() {
   await new Promise((r) => setTimeout(r, 80));
 }
 
-async function exportStubPngDataUrl() {
-  if (!window.htmlToImage) {
-    throw new Error("PNG renderer not loaded — check your network.");
-  }
-  const fields = readForm();
-  renderStub(fields);
-  await preloadStubFonts();
-  const ctx = createExportNode(fields);
-  if (!ctx) throw new Error("No stub to export — fill in your ticket details first.");
-  try {
-    await waitForPaint();
-    await waitForPaint();
-    return await window.htmlToImage.toPng(ctx.node, {
-      width: 1300,
-      height: 589,
-      pixelRatio: 2,
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-      skipFonts: false,
-      skipAutoScale: true,
-      includeQueryParams: true,
-    });
-  } finally {
-    ctx.host.remove();
-  }
+function downloadDataUrl(dataUrl, filename) {
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = dataUrl;
+  link.click();
 }
 
 async function exportPng() {
   try {
-    setStatus("Generating PNG...", "working");
-    const dataUrl = await exportStubPngDataUrl();
-    const link = document.createElement("a");
-    link.download = `ticketmaster-stub-${Date.now()}.png`;
-    link.href = dataUrl;
-    link.click();
-    setStatus("PNG downloaded (2600×1178, print-ready).", "ok");
+    const variants = getTicketVariants(readForm());
+    renderStub(readForm());
+    setStatus(
+      variants.length > 1 ? `Generating ${variants.length} PNGs...` : "Generating PNG...",
+      "working",
+    );
+    for (let i = 0; i < variants.length; i++) {
+      const variant = variants[i];
+      const dataUrl = await exportStubPngDataUrl(variant);
+      const seatTag = variant.seat ? `-seat-${variant.seat}` : "";
+      const suffix = variants.length > 1 ? `-${i + 1}${seatTag}` : "";
+      downloadDataUrl(dataUrl, `ticketmaster-stub${suffix}-${Date.now()}.png`);
+      if (variants.length > 1 && i < variants.length - 1) {
+        await new Promise((r) => setTimeout(r, 120));
+      }
+    }
+    const msg =
+      variants.length > 1
+        ? `${variants.length} PNGs downloaded (${STUB_WIDTH * 2}×${STUB_HEIGHT * 2} each).`
+        : `PNG downloaded (${STUB_WIDTH * 2}×${STUB_HEIGHT * 2}, print-ready).`;
+    setStatus(msg, "ok");
   } catch (e) {
     setStatus("PNG export failed: " + (e?.message || e), "err");
   }
@@ -178,27 +309,41 @@ async function exportSvg() {
     setStatus("SVG renderer not loaded.", "err");
     return;
   }
-  setStatus("Loading fonts...", "working");
-  await preloadStubFonts();
-  const ctx = createExportNode(readForm());
-  if (!ctx) return;
   try {
-    setStatus("Generating SVG...", "working");
-    const dataUrl = await window.htmlToImage.toSvg(ctx.node, {
-      width: 1300,
-      height: 589,
-      backgroundColor: "#ffffff",
-      cacheBust: true,
-    });
-    const link = document.createElement("a");
-    link.download = `ticketmaster-stub-${Date.now()}.svg`;
-    link.href = dataUrl;
-    link.click();
-    setStatus("SVG downloaded (vector, print-perfect).", "ok");
+    const variants = getTicketVariants(readForm());
+    setStatus("Loading fonts...", "working");
+    await preloadStubFonts();
+    for (let i = 0; i < variants.length; i++) {
+      const variant = variants[i];
+      setStatus(
+        variants.length > 1
+          ? `Generating SVG ${i + 1} of ${variants.length}...`
+          : "Generating SVG...",
+        "working",
+      );
+      const ctx = createExportNode(variant);
+      if (!ctx) continue;
+      try {
+        const dataUrl = await window.htmlToImage.toSvg(ctx.node, {
+          width: STUB_WIDTH,
+          height: STUB_HEIGHT,
+          backgroundColor: "#ffffff",
+          cacheBust: true,
+        });
+        const seatTag = variant.seat ? `-seat-${variant.seat}` : "";
+        const suffix = variants.length > 1 ? `-${i + 1}${seatTag}` : "";
+        downloadDataUrl(dataUrl, `ticketmaster-stub${suffix}-${Date.now()}.svg`);
+      } finally {
+        ctx.host.remove();
+      }
+    }
+    const msg =
+      variants.length > 1
+        ? `${variants.length} SVGs downloaded (vector, print-perfect).`
+        : "SVG downloaded (vector, print-perfect).";
+    setStatus(msg, "ok");
   } catch (e) {
     setStatus("SVG export failed: " + (e?.message || e), "err");
-  } finally {
-    ctx.host.remove();
   }
 }
 
@@ -254,7 +399,8 @@ export function parseOcrText(text) {
     .replace(/\bRDW\b/gi, "ROW")
     // Common Apple Wallet / Ticketmaster mobile labels
     .replace(/\bSEC\/AISLE\b/gi, "SECTION")
-    .replace(/\bROW\/BOX\b/gi, "ROW");
+    .replace(/\bROW\/BOX\b/gi, "ROW")
+    .replace(/[·•—–]/g, " ");
 
   const lines = normalized
     .split(/\r?\n/)
@@ -325,6 +471,28 @@ export function parseOcrText(text) {
   const seatM = joined.match(seatRe);
   if (seatM) fields.seat = cleanCapture(seatM[1]);
 
+  // Ticketmaster confirmation email/app: "Sec FLR2, Row 4, Seat 15 - 16"
+  const tmConfirm = joined.match(
+    /\bSEC(?:TION)?\.?\s*([A-Z0-9]+)\s*,\s*ROW\s*([A-Z0-9-]+)\s*,\s*SEATS?\s*(\d{1,4})\s*(?:-|TO|THROUGH)\s*(\d{1,4})\b/i,
+  );
+  if (tmConfirm) {
+    fields.section = upper(tmConfirm[1]);
+    fields.row = upper(tmConfirm[2]);
+    fields.seat = `${tmConfirm[3]}-${tmConfirm[4]}`;
+  }
+
+  // Seat span anywhere: "Seat 15 - 16" (overrides single-seat capture above)
+  const seatSpan = joined.match(
+    /\bSEATS?\s*(?:[:#]?\s*)?(\d{1,4})\s*(?:-|TO|THROUGH)\s*(\d{1,4})\b/i,
+  );
+  if (seatSpan) {
+    fields.seat = `${seatSpan[1]}-${seatSpan[2]}`;
+  }
+
+  // Order # 54-37660/DAL (Ticketmaster confirmation header)
+  const orderRef = joined.match(/\bORDER\s*#?\s*([\d]+-[\d]+\/[A-Z]{2,6})\b/i);
+  if (orderRef) fields.orderCode = upper(orderRef[1]);
+
   // Inline triple "Sec 117 · Row 14 · Seat 1" form — stronger match than singles
   const tripleInline = joined.match(
     /SEC(?:TION)?[:\s]+([A-Z0-9 -]+?)[\s,|·•/-]+ROW[:\s]+([A-Z0-9-]+)[\s,|·•/-]+SEAT[S]?[:\s]+(\d+[A-Z]?)/i,
@@ -333,6 +501,46 @@ export function parseOcrText(text) {
     fields.section = upper(tripleInline[1]).trim();
     fields.row = upper(tripleInline[2]);
     fields.seat = upper(tripleInline[3]);
+  }
+
+  // Multiple ticket cards in one screenshot — collect every Sec/Row/Seat triple.
+  const seating = [];
+  const tripleRe =
+    /SEC(?:TION)?[:\s]+([A-Z0-9 -]+?)[\s,|·•/-]+ROW[:\s]+([A-Z0-9-]+)[\s,|·•/-]+SEAT[S]?[:\s]+(\d+[A-Z]?)/gi;
+  let tripleMatch;
+  while ((tripleMatch = tripleRe.exec(joined)) !== null) {
+    seating.push({
+      section: upper(tripleMatch[1]).trim(),
+      row: upper(tripleMatch[2]),
+      seat: upper(tripleMatch[3]),
+    });
+  }
+  if (seating.length > 1) {
+    fields.seating = seating;
+    fields.seat = seating.map((s) => s.seat).join(", ");
+    fields.section = fields.section || seating[0].section;
+    fields.row = fields.row || seating[0].row;
+  }
+
+  // "Seats 1-4" / "Seat 1, 2, 3" style ranges without repeating triples.
+  if (!fields.seating?.length) {
+    const seatRange = joined.match(
+      /\bSEATS?\s*(?:[:#]?\s*)?(\d{1,4})\s*(?:-|–|—|TO|THROUGH)\s*(\d{1,4})\b/i,
+    );
+    if (seatRange) {
+      const start = parseInt(seatRange[1], 10);
+      const end = parseInt(seatRange[2], 10);
+      if (!Number.isNaN(start) && !Number.isNaN(end) && end > start && end - start <= 31) {
+        fields.seat = Array.from({ length: end - start + 1 }, (_, i) => String(start + i)).join(", ");
+      }
+    }
+    const seatList = joined.match(
+      /\bSEATS?\s*(?:[:#]?\s*)((?:\d{1,4}\s*(?:[,/&+]\s*)?)+\d{1,4})\b/i,
+    );
+    if (seatList && !(fields.seat || "").includes(",")) {
+      const parts = seatList[1].split(/[\s,/&+]+/).filter((p) => /^\d{1,4}$/.test(p));
+      if (parts.length > 1) fields.seat = parts.join(", ");
+    }
   }
 
   // Section/Row/Seat shown stacked as label\n(blank?)\nvalue (mobile UI style).
@@ -474,6 +682,7 @@ export function parseOcrText(text) {
     "CONVENIENCE","CHARGE","CAMERAS","RECORDERS","NO","OR",
     "TICKETMASTER","LIVENATION","EXCHANGE","REFUNDS","REENTRY",
     "PROVIDED","HEREIN","EXCEPT","GET","TICKETS","AT",
+    "YOU","GOT","THE","DIRECTIONS","VIEW","MOBILE",
   ]);
   const isClean = (line) =>
     /^[A-Z][A-Z .'&-]+[A-Z]$/i.test(line) &&
@@ -482,11 +691,20 @@ export function parseOcrText(text) {
 
   const cleanLines = lines.map(upper).filter(isClean);
 
+  // "Artist - Tour Name" (Ticketmaster confirmation layout)
+  const tourTitle = lines.find((l) => /\s-\s.+Tour/i.test(l));
+  if (tourTitle) {
+    const parts = tourTitle.split(/\s-\s/);
+    if (parts[0]) fields.eventLine2 = upper(parts[0].trim());
+    if (parts[1]) fields.tour = upper(parts[1].trim());
+  }
+
   // Artist: shortest clean line with no "TOUR/VENUE/etc" keywords
   let artist = cleanLines.find(
-    (l) => !/TOUR|PAVILION|ARENA|CENTER|CENTRE|THEATRE|THEATER|STADIUM|HALL|GARDEN|PAVILION|COLISEUM|HP |WWW|WORLD|PRESENTS/.test(l),
+    (l) =>
+      !/TOUR|PAVILION|ARENA|CENTER|CENTRE|THEATRE|THEATER|STADIUM|HALL|GARDEN|PAVILION|COLISEUM|HP |WWW|WORLD|PRESENTS|YOU GOT|TICKETS|ORDER|DIRECTIONS/.test(l),
   );
-  if (artist) fields.eventLine2 = artist;
+  if (artist && !fields.eventLine2) fields.eventLine2 = artist;
 
   // Tour: line with tour-ish keyword (skip URLs and venues we already grabbed)
   const tourLine = cleanLines.find((l) => {
@@ -587,6 +805,24 @@ async function runVision(dataUrl) {
   return res.json();
 }
 
+function applySeatingFromExtract(fields) {
+  if (Array.isArray(fields.seating) && fields.seating.length > 1) {
+    state.seating = fields.seating.map((row) => ({
+      section: upper(row.section || fields.section),
+      row: upper(row.row || fields.row),
+      seat: upper(row.seat),
+    })).filter((row) => row.seat);
+    fields.seat = state.seating.map((row) => row.seat).join(", ");
+    delete fields.seating;
+    return;
+  }
+  state.seating = null;
+  const slots = resolveSeatingSlots(fields);
+  if (slots.length > 1) {
+    fields.seat = slots.map((row) => row.seat).join(", ");
+  }
+}
+
 function handleFile(file) {
   if (!file?.type?.startsWith("image/")) {
     setStatus("Please choose an image file.", "err");
@@ -640,6 +876,12 @@ async function extract() {
     const merged = mergeFields(visionFields, ocrFields);
     const fields = normalizeExtractedFields(merged);
 
+    if (/YOU\s+GOT|TICKETS\s*$/i.test(fields.eventLine2 || "")) {
+      fields.eventLine2 = ocrFields.eventLine2 || "";
+    }
+    if (!fields.eventLine2 && ocrFields.eventLine2) fields.eventLine2 = ocrFields.eventLine2;
+    if (!fields.tour && ocrFields.tour) fields.tour = ocrFields.tour;
+
     if (visionRes.status === "rejected") {
       console.warn("Server extract unavailable:", visionRes.reason);
     }
@@ -654,19 +896,27 @@ async function extract() {
     }
 
     state.fields = { ...blankFields(), ...fields };
-    $("#edit-panel").classList.remove("hidden");
+    applySeatingFromExtract(state.fields);
+    state.demoMode = false;
+    $("#edit-panel")?.classList.remove("hidden");
     fillForm(state.fields);
     // Render from state.fields (source of truth) and sync form → stub again.
     renderStub(state.fields);
     requestAnimationFrame(() => renderStub(readForm()));
 
-    console.log("[extract] final fields:", state.fields);
+    console.log("[extract] final fields:", state.fields, "seating:", state.seating);
 
+    const ticketCount = getTicketVariants(state.fields).length;
     const required = ["section", "row", "seat", "eventLine2", "datetime"];
     const missing = required.filter((k) => !(state.fields[k] || "").trim());
     const seatMissing = ["section", "row", "seat"].filter((k) => !(state.fields[k] || "").trim());
 
-    if (missing.length === 0) {
+    if (ticketCount > 1) {
+      setStatus(
+        `${ticketCount} tickets detected — one stub per seat. Review shared details below.`,
+        "ok",
+      );
+    } else if (missing.length === 0) {
       const summary = ["section", "row", "seat"]
         .map((k) => `${k}=${state.fields[k]}`).join(", ");
       setStatus(`Details extracted (${summary}) — review and print.`, "ok");
@@ -726,7 +976,11 @@ function initActions() {
   $("#download-btn").addEventListener("click", () => exportPng());
   $("#download-svg-btn")?.addEventListener("click", () => exportSvg());
 
-  form.addEventListener("input", () => {
+  form.addEventListener("input", (e) => {
+    if (state.demoMode) state.demoMode = false;
+    if (e.target?.name === "seat" || e.target?.name === "row" || e.target?.name === "section") {
+      state.seating = null;
+    }
     renderStub(readForm());
   });
 }
@@ -929,10 +1183,11 @@ async function startCheckout() {
   }
   try {
     const stubFields = { ...readForm() };
+    const variants = getTicketVariants(stubFields);
     let stubPng;
     try {
       if (btn) btn.textContent = "Rendering stub…";
-      stubPng = await exportStubPngDataUrl();
+      stubPng = await exportStubPngDataUrl(variants[0]);
     } catch (e) {
       throw new Error(e?.message || "Could not prepare stub image for printing.");
     }
@@ -1085,7 +1340,13 @@ async function handleCheckoutReturn() {
   initUpload();
   initActions();
   initOrderModal();
-  fillForm(state.fields);
-  renderStub(state.fields);
+  initStubPreviewScaling();
+  loadDemoExample();
   handleCheckoutReturn();
+
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted && !new URLSearchParams(window.location.search).has("checkout")) {
+      loadDemoExample();
+    }
+  });
 })();

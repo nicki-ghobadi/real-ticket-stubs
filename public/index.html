@@ -72,7 +72,7 @@
             <label>Section / aisle<input name="section" type="text" placeholder="FLR 3" /></label>
             <label>Aisle<input name="aisle" type="text" placeholder="AISLE 26" /></label>
             <label>Row<input name="row" type="text" placeholder="14" /></label>
-            <label>Seat<input name="seat" type="text" placeholder="1" /></label>
+            <label>Seat<input name="seat" type="text" placeholder="1 or 1-4 or 1, 2, 3" /></label>
             <label>Price<input name="price" type="text" placeholder="180.00" /></label>
             <label>Admission code<input name="admissionType" type="text" placeholder="VAUCTN" /></label>
             <label>Event #<input name="eventNum" type="text" placeholder="1046555" /></label>
@@ -89,10 +89,10 @@
 
       <section class="panel panel-output" aria-labelledby="output-heading">
         <h2 id="output-heading">3. Print-ready stub</h2>
-        <p class="hint">Vector Ticketmaster layout (1300x589). Print at 100% or save high-res PNG.</p>
+        <p class="hint" id="output-hint">Landscape strip: 5.50″ wide × 1.75″ tall (300 dpi). Print at 100% scale — do not fit to page.</p>
 
         <div class="stub-preview-wrap">
-          <div class="stub-stage" id="stub-stage"></div>
+          <div class="stub-stack" id="stub-stack"></div>
         </div>
 
         <div class="actions print-actions">
