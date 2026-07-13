@@ -11,6 +11,7 @@ import {
   resolveSeatingSlots,
   STUB_WIDTH,
   STUB_HEIGHT,
+  MIN_STUB_PNG_BYTES,
 } from "./templates.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -229,7 +230,7 @@ function createExportNode(fields) {
   return { host, node };
 }
 
-async function exportStubPngDataUrl(fields) {
+async function exportStubPngDataUrl(fields, { seatLabel = "" } = {}) {
   if (!window.htmlToImage) {
     throw new Error("PNG renderer not loaded — check your network.");
   }
@@ -239,7 +240,7 @@ async function exportStubPngDataUrl(fields) {
   try {
     await waitForPaint();
     await waitForPaint();
-    return await window.htmlToImage.toPng(ctx.node, {
+    const dataUrl = await window.htmlToImage.toPng(ctx.node, {
       width: STUB_WIDTH,
       height: STUB_HEIGHT,
       pixelRatio: 2,
@@ -249,8 +250,25 @@ async function exportStubPngDataUrl(fields) {
       skipAutoScale: true,
       includeQueryParams: true,
     });
+    assertRenderedPngDataUrl(dataUrl, seatLabel);
+    return dataUrl;
   } finally {
     ctx.host.remove();
+  }
+}
+
+/** Client-side guard: reject blank/incomplete exports before checkout. */
+function assertRenderedPngDataUrl(dataUrl, seatLabel = "") {
+  if (!dataUrl?.startsWith("data:image/png;base64,")) {
+    throw new Error(`Could not render ticket${seatLabel}. Try again.`);
+  }
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  const approxBytes = Math.floor((b64.length * 3) / 4);
+  if (approxBytes < MIN_STUB_PNG_BYTES) {
+    throw new Error(
+      `Ticket image${seatLabel} looks blank (${Math.round(approxBytes / 1024)} KB). ` +
+        "Review your stub preview, then try checkout again.",
+    );
   }
 }
 
@@ -1193,7 +1211,10 @@ async function startCheckout() {
               ? `Rendering stub ${i + 1} of ${variants.length}…`
               : "Rendering stub…";
         }
-        const stubPng = await exportStubPngDataUrl(variants[i]);
+        const stubPng = await exportStubPngDataUrl(variants[i], {
+          seatLabel:
+            variants.length > 1 ? ` for seat ${variants[i].seat || i + 1}` : "",
+        });
         stubTickets.push({ stubFields: variants[i], stubPng });
         if (variants.length > 1 && i < variants.length - 1) {
           await new Promise((r) => setTimeout(r, 80));

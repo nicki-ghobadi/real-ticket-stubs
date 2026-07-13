@@ -6,6 +6,7 @@
  *   node scripts/smoke-test.mjs --base http://localhost:3456
  */
 import "../load-env.mjs";
+import { renderStubPngBuffers } from "./render-stub-png.mjs";
 import { minStubPngDataUrl } from "./png-fixture.mjs";
 import { verifyOrderRecord, persistenceEnabled } from "../fulfillment.mjs";
 import { normalizeExtractedFields, prepareTicketData, parseSeatList, expandTicketsForSeating, resolveSeatingSlots } from "../public/templates.js";
@@ -135,41 +136,58 @@ try {
   if (config.res.status === 200 && config.json?.hasPaymentLinks !== undefined) ok("/api/config");
   else fail("/api/config");
 
-  const checkout = await post("/api/create-checkout-session", {
+  const smokeFields = {
+    eventLine2: "SMOKE TEST",
+    venue: "Arena",
+    datetime: "FRI JUN 8 2026 8:00 PM",
+    section: "FLR2",
+    row: "4",
+    seat: "15",
+    orderCode: "SMOKE01",
+    promo: "WWW.LIVENATION.COM",
+  };
+  const smokeVariants = expandTicketsForSeating(smokeFields, [
+    { section: "FLR2", row: "4", seat: "15" },
+    { section: "FLR2", row: "4", seat: "16" },
+  ]);
+  let smokePngBuffers;
+  try {
+    smokePngBuffers = await renderStubPngBuffers(smokeVariants, { base });
+    ok("Render checkout PNGs (2 tickets)");
+  } catch (e) {
+    fail("Render checkout PNGs", e.message);
+    smokePngBuffers = null;
+  }
+
+  const badCheckout = await post("/api/create-checkout-session", {
     cart: [{ product: "mail", quantity: 1 }],
-    stubFields: {
-      eventLine2: "SMOKE TEST",
-      venue: "Arena",
-      datetime: "FRI JUN 8 2026 8:00 PM",
-      section: "FLR2",
-      row: "4",
-      seat: "15",
-    },
+    stubFields: smokeFields,
     stubTickets: [
       {
-        stubFields: {
-          eventLine2: "SMOKE TEST",
-          venue: "Arena",
-          datetime: "FRI JUN 8 2026 8:00 PM",
-          section: "FLR2",
-          row: "4",
-          seat: "15",
-        },
-        stubPng: minStubPngDataUrl(),
-      },
-      {
-        stubFields: {
-          eventLine2: "SMOKE TEST",
-          venue: "Arena",
-          datetime: "FRI JUN 8 2026 8:00 PM",
-          section: "FLR2",
-          row: "4",
-          seat: "16",
-        },
+        stubFields: smokeFields,
         stubPng: minStubPngDataUrl(),
       },
     ],
   });
+  if (badCheckout.res.status === 400 && badCheckout.json?.error?.includes("blank")) {
+    ok("Reject placeholder stub PNG at checkout");
+  } else {
+    fail(
+      "Reject placeholder stub PNG at checkout",
+      `expected 400, got ${badCheckout.res.status}: ${JSON.stringify(badCheckout.json)}`,
+    );
+  }
+
+  const checkout = smokePngBuffers
+    ? await post("/api/create-checkout-session", {
+        cart: [{ product: "mail", quantity: 1 }],
+        stubFields: smokeFields,
+        stubTickets: smokeVariants.map((variant, i) => ({
+          stubFields: variant,
+          stubPng: `data:image/png;base64,${smokePngBuffers[i].toString("base64")}`,
+        })),
+      })
+    : { res: { status: 0 }, json: {} };
   if (checkout.res.status === 200 && checkout.json?.url?.includes("checkout.stripe.com")) {
     ok("POST /api/create-checkout-session");
     if (checkout.json.url.includes("cs_live_")) {

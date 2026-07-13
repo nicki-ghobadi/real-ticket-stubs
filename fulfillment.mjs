@@ -8,6 +8,7 @@
  */
 
 import { TICKET_FIELD_KEYS } from "./public/templates.js";
+import { MIN_STUB_PNG_BYTES, validateStubPngBuffer } from "./stub-png-validate.mjs";
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -292,6 +293,11 @@ export async function createPendingOrder({
     if (!buffer?.length) {
       return { orderId, persisted: false, error: `Missing stub PNG for ticket ${i + 1}.` };
     }
+    const valid = validateStubPngBuffer(buffer, `Ticket ${i + 1}`);
+    if (!valid.ok) {
+      console.error("Invalid print PNG rejected:", valid.error);
+      return { orderId, persisted: false, error: valid.error };
+    }
     const filename = ticketsInput.length === 1 ? "stub.png" : `stub-${i + 1}.png`;
     const uploaded = await uploadStubPng(orderId, buffer, filename);
     if (uploaded.error) {
@@ -444,7 +450,11 @@ export async function verifyOrderRecord(orderId, { expectStatus = "paid", expect
     }
     const png = await downloadStubPng(ticket.stub_png_path);
     if (!png?.length) issues.push(`${label}: PNG missing from storage`);
-    else pngBytes += png.length;
+    else {
+      pngBytes += png.length;
+      const valid = validateStubPngBuffer(png, label);
+      if (!valid.ok) issues.push(valid.error);
+    }
     const fields = ticket.stub_fields || {};
     if (!fields.seat && !fields.section && !fields.eventLine2) {
       issues.push(`${label}: stub_fields incomplete`);
@@ -613,8 +623,8 @@ export async function completePaidOrder(orderInput) {
       stubPngPath: order.stubPngPath,
       fieldCount: Object.keys(order.stubFields || {}).length,
     });
-    await sendFulfillmentNotifications(order);
-    await markOwnerNotified(order.id);
+    const notify = await sendFulfillmentNotifications(order);
+    if (notify.ownerSent) await markOwnerNotified(order.id);
   }
 
   return { created: needsNotify, order };
@@ -859,11 +869,32 @@ export async function sendOwnerNotification(order) {
 }
 
 export async function sendFulfillmentNotifications(order) {
+  let printCheck = { ok: true };
+  if (persistenceEnabled && order.id) {
+    printCheck = await verifyOrderRecord(order.id, { expectStatus: "paid" });
+    if (!printCheck.ok) {
+      console.error(
+        "🚨 PRINT FULFILLMENT BLOCKED — order has invalid or missing ticket PNGs:",
+        printCheck.error,
+      );
+    }
+  }
+
   const customer = await sendOrderConfirmation(order);
   if (customer.error) console.error("Confirmation email error:", customer.error);
   else if (customer.sent) console.log("✉️  Confirmation email sent to", order.email);
 
-  const owner = await sendOwnerNotification(order);
-  if (owner.error) console.error("Owner notification error:", owner.error);
-  else if (owner.sent) console.log("📬 Fulfillment alert sent to", FULFILLMENT_EMAIL);
+  let ownerSent = false;
+  if (printCheck.ok) {
+    const owner = await sendOwnerNotification(order);
+    if (owner.error) console.error("Owner notification error:", owner.error);
+    else if (owner.sent) {
+      ownerSent = true;
+      console.log("📬 Fulfillment alert sent to", FULFILLMENT_EMAIL);
+    }
+  } else {
+    console.error("📬 Owner print email skipped until valid ticket PNGs are stored for order", order.id);
+  }
+
+  return { customerSent: !!customer.sent, ownerSent, printOk: printCheck.ok };
 }

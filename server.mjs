@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import Stripe from "stripe";
 import { validateShippingComplete, validateAddressWithGoogle } from "./shipping-verify-server.mjs";
 import { normalizeExtractedFields } from "./public/templates.js";
+import { validateStubPngBuffer } from "./stub-png-validate.mjs";
 import {
   createPendingOrder,
   linkStripeSession,
@@ -213,15 +214,8 @@ function requirePendingOrderSaved(pending) {
   return { orderId: pending.orderId };
 }
 
-/** Decode PNG IHDR width/height. */
-function pngDimensions(buffer) {
-  if (!buffer || buffer.length < 24) return null;
-  if (buffer.toString("ascii", 1, 4) !== "PNG") return null;
-  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
-}
-
 /** Decode a PNG data-URL from checkout (print-ready stub). */
-function parseStubPng(dataUrl) {
+function parseStubPng(dataUrl, label = "Ticket") {
   if (!dataUrl || typeof dataUrl !== "string") {
     return { error: "Missing stub image. Render your stub before checkout." };
   }
@@ -233,13 +227,9 @@ function parseStubPng(dataUrl) {
   }
   const buffer = Buffer.from(b64, "base64");
   if (buffer.length > 15 * 1024 * 1024) return { error: "Stub image is too large (15 MB max)." };
-  const dim = pngDimensions(buffer);
-  if (!dim || dim.width < 1000 || dim.height < 400) {
-    return {
-      error: "Stub image looks blank or too small. Fill in your ticket stub preview, then try checkout again.",
-    };
-  }
-  return { buffer, dimensions: dim };
+  const valid = validateStubPngBuffer(buffer, label);
+  if (!valid.ok) return { error: valid.error };
+  return { buffer, dimensions: valid.dimensions };
 }
 
 /** Parse one or more print-ready stub PNGs + per-seat fields from checkout payload. */
@@ -251,7 +241,7 @@ function parseCheckoutStubs(payload) {
     for (let i = 0; i < payload.stubTickets.length; i++) {
       const entry = payload.stubTickets[i] || {};
       const fields = sanitizeStubFields(entry.stubFields || entry.fields || sharedFields);
-      const pngParsed = parseStubPng(entry.stubPng || entry.png);
+      const pngParsed = parseStubPng(entry.stubPng || entry.png, `Ticket ${i + 1}`);
       if (pngParsed.error) {
         return { error: `Ticket ${i + 1}: ${pngParsed.error}` };
       }

@@ -6,6 +6,13 @@
  *   node scripts/test-png-export.mjs --base=http://localhost:3456
  */
 import { chromium } from "playwright";
+import {
+  STUB_WIDTH,
+  STUB_HEIGHT,
+  STUB_EXPORT_WIDTH,
+  STUB_EXPORT_HEIGHT,
+  MIN_STUB_PNG_BYTES,
+} from "../public/templates.js";
 
 const base = (
   process.argv.find((a) => a.startsWith("--base="))?.split("=")[1]
@@ -91,7 +98,7 @@ try {
   await page.waitForTimeout(500);
 
   const layout = await page.evaluate(async (fields) => {
-    const { prepareTicketData, buildTicketHtml } = await import("/templates.js");
+    const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT } = await import("/templates.js");
     const d = prepareTicketData(fields);
     const host = document.createElement("div");
     host.className = "stub-export-host";
@@ -136,8 +143,8 @@ try {
     return { items, hostBox: { width: hostBox.width, height: hostBox.height } };
   }, LONG_FIELDS);
 
-  if (Math.round(layout.hostBox.width) !== 1300 || Math.round(layout.hostBox.height) !== 589) {
-    fail(`Export node size ${layout.hostBox.width}x${layout.hostBox.height}, expected 1300x589`);
+  if (Math.round(layout.hostBox.width) !== STUB_WIDTH || Math.round(layout.hostBox.height) !== STUB_HEIGHT) {
+    fail(`Export node size ${layout.hostBox.width}x${layout.hostBox.height}, expected ${STUB_WIDTH}x${STUB_HEIGHT}`);
   }
   ok(`Export node renders at ${Math.round(layout.hostBox.width)}×${Math.round(layout.hostBox.height)}`);
 
@@ -171,7 +178,7 @@ try {
     await new Promise((r) => setTimeout(r, 300));
     await document.fonts.ready;
 
-    const { prepareTicketData, buildTicketHtml } = await import("/templates.js");
+    const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT } = await import("/templates.js");
     const d = prepareTicketData(fields);
     const host = document.createElement("div");
     host.className = "stub-export-host";
@@ -181,8 +188,8 @@ try {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const url = await window.htmlToImage.toPng(node, {
-      width: 1300,
-      height: 589,
+      width: STUB_WIDTH,
+      height: STUB_HEIGHT,
       pixelRatio: 2,
       backgroundColor: "#ffffff",
       cacheBust: true,
@@ -200,12 +207,12 @@ try {
   const dim = pngDimensions(buffer);
   if (!dim) fail("Could not read PNG dimensions");
 
-  if (dim.width !== 2600 || dim.height !== 1178) {
-    fail(`PNG size ${dim.width}x${dim.height}, expected 2600x1178 (1300x589 @2x)`);
+  if (dim.width !== STUB_EXPORT_WIDTH || dim.height !== STUB_EXPORT_HEIGHT) {
+    fail(`PNG size ${dim.width}x${dim.height}, expected ${STUB_EXPORT_WIDTH}x${STUB_EXPORT_HEIGHT} (${STUB_WIDTH}x${STUB_HEIGHT} @2x)`);
   }
   ok(`PNG export ${dim.width}×${dim.height} (${Math.round(buffer.length / 1024)} KB)`);
 
-  if (buffer.length < 50_000) {
+  if (buffer.length < MIN_STUB_PNG_BYTES) {
     fail(`PNG too small (${buffer.length} bytes) — likely blank or incomplete render`);
   }
   ok("PNG file size looks healthy");
