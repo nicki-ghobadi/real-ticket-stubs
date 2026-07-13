@@ -158,6 +158,7 @@ if (persistenceEnabled) {
         }
         console.log("\n📋 Supabase — open Table Editor → orders, row id:", pending.orderId);
         console.log("   Storage → order-stubs →", pending.orderId, "→ stub.png");
+        console.log("   Email attachment + inline image use the same PNG bytes from storage (synced from site preview).");
       }
       if (emailEnabled && paid.created) {
         console.log("✅ Customer confirmation email sent to", testEmail);

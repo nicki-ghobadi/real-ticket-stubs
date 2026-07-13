@@ -157,6 +157,46 @@ async function uploadStubPng(orderId, pngBuffer, filename = "stub.png") {
   }
 }
 
+function appBaseUrl() {
+  const explicit = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
+  if (explicit) return explicit;
+  const vercel = (process.env.VERCEL_URL || "").replace(/\/$/, "");
+  if (vercel) return `https://${vercel}`;
+  return "http://localhost:3456";
+}
+
+/** Re-render stub PNGs from the live site and upsert storage so print assets match the preview. */
+async function syncPrintPngsBeforeNotify(order) {
+  if (!persistenceEnabled || !order?.id) return order;
+  const entries = orderTicketEntries(order);
+  if (!entries.length) return order;
+
+  const fieldsList = entries.map((t) =>
+    sanitizeStubFields({ ...(order.stubFields || {}), ...(t.stub_fields || {}) }),
+  );
+
+  try {
+    const { renderStubPngBuffers } = await import("./scripts/render-stub-png.mjs");
+    const base = appBaseUrl();
+    const buffers = await renderStubPngBuffers(fieldsList, { base });
+    for (let i = 0; i < buffers.length; i++) {
+      const filename = buffers.length === 1 ? "stub.png" : `stub-${i + 1}.png`;
+      const uploaded = await uploadStubPng(order.id, buffers[i], filename);
+      if (uploaded.error) throw new Error(uploaded.error);
+      console.log(
+        `🔄 Synced print PNG (ticket ${i + 1}/${buffers.length}) from site preview:`,
+        uploaded.path,
+        `(${Math.round((uploaded.bytes || 0) / 1024)} KB)`,
+      );
+    }
+    const refreshed = await getOrderById(order.id);
+    return refreshed || order;
+  } catch (e) {
+    console.warn("⚠️  Print PNG sync skipped — using stored checkout PNGs:", e.message);
+    return order;
+  }
+}
+
 async function downloadStubPng(stubPngPath) {
   if (!stubPngPath || !persistenceEnabled) return null;
   const objectPath = stubPngPath.startsWith(`${STUB_BUCKET}/`)
@@ -707,7 +747,7 @@ function buildCustomerEmail(order) {
   return { subject: `Order confirmed — ${code}`, html, text };
 }
 
-async function buildOwnerEmail(order) {
+async function buildOwnerEmail(order, inlineStubs = []) {
   const code = confirmationCode(order.sessionId);
   const amount = formatMoney(order.amountTotal, order.currency);
   const addr = oneLineAddress(order.shipping);
@@ -719,18 +759,32 @@ async function buildOwnerEmail(order) {
   const tickets = orderTicketEntries(order);
   const stubBlocks = [];
   const stubTextLines = [];
-  for (const ticket of tickets) {
-    const seatLabel = [ticket.section, ticket.row, ticket.seat].filter(Boolean).join(" / ") || `Ticket ${ticket.index || 1}`;
-    const stubUrl = ticket.stub_png_path ? await createSignedStubUrl(ticket.stub_png_path) : null;
-    if (stubUrl) {
+
+  if (inlineStubs.length) {
+    for (const stub of inlineStubs) {
       stubBlocks.push(
-        `<h3 style="font-size:14px;margin:18px 0 8px">Print stub — ${esc(seatLabel)}</h3>` +
-          `<p style="margin:8px 0"><a href="${esc(stubUrl)}" style="color:#0066cc">Download PNG (24h link)</a></p>` +
-          `<p style="margin:8px 0"><img src="${esc(stubUrl)}" alt="Stub ${esc(seatLabel)}" style="max-width:100%;border:1px solid #ddd" /></p>` +
-          stubFieldsHtml(ticket.stub_fields || {}),
+        `<h3 style="font-size:14px;margin:18px 0 8px">Print stub — ${esc(stub.seatLabel)}</h3>` +
+          `<p style="margin:8px 0"><img src="cid:${esc(stub.cid)}" alt="Stub ${esc(stub.seatLabel)}" style="max-width:100%;border:1px solid #ddd" /></p>` +
+          stubFieldsHtml(stub.fields || {}),
       );
-      stubTextLines.push(`Print PNG (${seatLabel}): ${stubUrl}`);
-      stubTextLines.push(stubFieldsText(ticket.stub_fields || {}));
+      stubTextLines.push(`Print PNG (${stub.seatLabel}): attached (${stub.filename})`);
+      stubTextLines.push(stubFieldsText(stub.fields || {}));
+    }
+  } else {
+    for (const ticket of tickets) {
+      const seatLabel =
+        [ticket.section, ticket.row, ticket.seat].filter(Boolean).join(" / ")
+        || `Ticket ${ticket.index || 1}`;
+      const stubUrl = ticket.stub_png_path ? await createSignedStubUrl(ticket.stub_png_path) : null;
+      if (stubUrl) {
+        stubBlocks.push(
+          `<h3 style="font-size:14px;margin:18px 0 8px">Print stub — ${esc(seatLabel)}</h3>` +
+            `<p style="margin:8px 0"><a href="${esc(stubUrl)}" style="color:#0066cc">Download PNG (24h link)</a></p>` +
+            stubFieldsHtml(ticket.stub_fields || {}),
+        );
+        stubTextLines.push(`Print PNG (${seatLabel}): ${stubUrl}`);
+        stubTextLines.push(stubFieldsText(ticket.stub_fields || {}));
+      }
     }
   }
   const stubLink = stubBlocks.length
@@ -827,36 +881,41 @@ export async function sendOwnerNotification(order) {
     return { sent: false };
   }
   const code = confirmationCode(order.sessionId);
-  const { subject, html, text } = await buildOwnerEmail(order);
 
   const attachments = [];
+  const inlineStubs = [];
   const tickets = orderTicketEntries(order);
   for (const ticket of tickets) {
     const seatTag = ticket.seat ? `seat-${ticket.seat}` : `ticket-${ticket.index || 1}`;
+    const seatLabel =
+      [ticket.section, ticket.row, ticket.seat].filter(Boolean).join(" / ")
+      || `Ticket ${ticket.index || 1}`;
     if (!ticket.stub_png_path) continue;
     const png = await downloadStubPng(ticket.stub_png_path);
-    if (png?.length) {
-      attachments.push({
-        filename: `stub-${code}-${seatTag}.png`,
-        content: png.toString("base64"),
-      });
-      console.log(`📎 Owner email: attaching ${seatTag} PNG (${Math.round(png.length / 1024)} KB)`);
+    if (!png?.length) {
+      console.error("Owner email: could not download stub PNG from", ticket.stub_png_path);
       continue;
     }
-    const stubUrl = await createSignedStubUrl(ticket.stub_png_path, 86_400);
-    if (stubUrl) {
-      attachments.push({
-        filename: `stub-${code}-${seatTag}.png`,
-        path: stubUrl,
-      });
-      console.log(`📎 Owner email: attaching ${seatTag} via signed URL (${ticket.stub_png_path})`);
-      continue;
-    }
-    console.error("Owner email: could not download stub PNG from", ticket.stub_png_path);
+    const cid = `stub-${seatTag}`;
+    const filename = `stub-${code}-${seatTag}.png`;
+    attachments.push({
+      filename,
+      content: png.toString("base64"),
+      content_id: cid,
+    });
+    inlineStubs.push({
+      cid,
+      filename,
+      seatLabel,
+      fields: ticket.stub_fields || {},
+    });
+    console.log(`📎 Owner email: attaching ${seatTag} PNG (${Math.round(png.length / 1024)} KB, cid:${cid})`);
   }
   if (!attachments.length) {
     console.error("Owner email: order has no stub PNGs — nothing attached");
   }
+
+  const { subject, html, text } = await buildOwnerEmail(order, inlineStubs);
 
   return sendResendEmail({
     to: FULFILLMENT_EMAIL,
@@ -869,9 +928,14 @@ export async function sendOwnerNotification(order) {
 }
 
 export async function sendFulfillmentNotifications(order) {
-  let printCheck = { ok: true };
+  let orderForPrint = order;
   if (persistenceEnabled && order.id) {
-    printCheck = await verifyOrderRecord(order.id, { expectStatus: "paid" });
+    orderForPrint = await syncPrintPngsBeforeNotify(order);
+  }
+
+  let printCheck = { ok: true };
+  if (persistenceEnabled && orderForPrint.id) {
+    printCheck = await verifyOrderRecord(orderForPrint.id, { expectStatus: "paid" });
     if (!printCheck.ok) {
       console.error(
         "🚨 PRINT FULFILLMENT BLOCKED — order has invalid or missing ticket PNGs:",
@@ -886,7 +950,7 @@ export async function sendFulfillmentNotifications(order) {
 
   let ownerSent = false;
   if (printCheck.ok) {
-    const owner = await sendOwnerNotification(order);
+    const owner = await sendOwnerNotification(orderForPrint);
     if (owner.error) console.error("Owner notification error:", owner.error);
     else if (owner.sent) {
       ownerSent = true;

@@ -1076,6 +1076,10 @@ server.listen(PORT, () => {
   console.log(`  🔗 Payment links: ${linkCount}/2 configured (STRIPE_PAYMENT_LINK_MAIL / _FRAMED in .env)`);
   console.log(`  📦 Address deliverability check: ${ADDRESS_VALIDATION ? "Google Address Validation ON" : "off (set GOOGLE_ADDRESS_VALIDATION_API_KEY)"}`);
   console.log(`  🗄  Order persistence: ${persistenceEnabled ? "Supabase ON" : "off (set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)"}`);
+  const appBase =
+    (process.env.APP_BASE_URL || "").replace(/\/$/, "")
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3456");
+  console.log(`  🖨  Print PNG sync base: ${appBase}`);
   console.log(`  ✉️  Customer emails: ${emailEnabled ? "Resend ON" : "off (set RESEND_API_KEY + ORDER_FROM_EMAIL)"}`);
   console.log(`  📬 Owner alerts: ${ownerEmailEnabled ? `Resend → ${process.env.FULFILLMENT_EMAIL || process.env.ORDER_FROM_EMAIL}` : "off (set FULFILLMENT_EMAIL + RESEND_API_KEY)"}`);
   console.log(`  🔒 CORS allowlist: ${ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS.join(", ") : "same-origin only"}`);
