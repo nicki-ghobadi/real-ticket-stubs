@@ -1,5 +1,6 @@
 /* Vector Ticketmaster stub — designed at 1650×600 (5.50in × 2.00in @ 300dpi).
-   Pure HTML/CSS/SVG, no raster image; safe for high-quality print. */
+   Preview/export: black thermal ink on blank blue cardstock (Boca 2″×5.5″ style).
+   No colored print — only the stock is blue; all layout ink is black. */
 
 /* Force any monospace value to render in bold-thermal weight; OCR-A Std only
    provides regular, so fallback Courier is used at weight 700. */
@@ -16,6 +17,8 @@
   --tm-blue-dark: #194279;
   --tm-blue-hdr: #a8c4df;
   --tm-blue-tint: #cfe1f1;
+  /** Blank Boca-style thermal cardstock — medium blue; only text/barcode prints black. */
+  --tm-stock: #4a8fd4;
   --tm-yellow: #f5c400;
   --tm-ink: #060606;
 
@@ -27,7 +30,7 @@
   position: relative;
   width: var(--tm-w);
   height: var(--tm-h);
-  background: #fff;
+  background: transparent;
   color: var(--tm-ink);
   font-family: var(--tm-mono);
   line-height: 1;
@@ -76,7 +79,7 @@
   top: 0;
   width: 264px;
   height: 100%;
-  background: var(--tm-blue-tint);
+  background: transparent;
 }
 
 .tm-left-top {
@@ -86,7 +89,7 @@
   width: 100%;
   height: 49px;
   padding: 10px 18px;
-  background: var(--tm-blue-hdr);
+  background: transparent;
   font-size: 31px;
   font-weight: 700;
 }
@@ -98,8 +101,8 @@
   width: 100%;
   height: 23px;
   padding: 4px 18px;
-  background: var(--tm-blue);
-  color: #fff;
+  background: transparent;
+  color: var(--tm-ink);
   font-family: var(--tm-label);
   font-size: 10px;
   font-weight: 700;
@@ -122,7 +125,7 @@
   font-family: var(--tm-label);
   font-size: 9px;
   font-weight: 700;
-  color: #444;
+  color: var(--tm-ink);
   letter-spacing: 0.04em;
 }
 
@@ -141,8 +144,8 @@
   width: 100%;
   height: 18px;
   padding: 4px 18px;
-  background: var(--tm-blue);
-  color: #fff;
+  background: transparent;
+  color: var(--tm-ink);
   font-family: var(--tm-label);
   font-size: 10px;
   font-weight: 700;
@@ -178,8 +181,8 @@
   width: 60%;
   height: 18px;
   padding: 4px 18px;
-  background: var(--tm-blue);
-  color: #fff;
+  background: transparent;
+  color: var(--tm-ink);
   font-family: var(--tm-label);
   font-size: 10px;
   font-weight: 700;
@@ -193,8 +196,8 @@
   width: 40%;
   height: 18px;
   padding: 4px 18px;
-  background: var(--tm-blue);
-  color: #fff;
+  background: transparent;
+  color: var(--tm-ink);
   font-family: var(--tm-label);
   font-size: 10px;
   font-weight: 700;
@@ -276,7 +279,7 @@
   width: 100%;
   height: 26px;
   padding: 5px 28px;
-  background: var(--tm-blue-hdr);
+  background: transparent;
   display: grid;
   grid-template-columns: 213px 140px 114px 213px 1fr;
   align-items: center;
@@ -348,22 +351,7 @@
 }
 
 .tm-wm {
-  position: absolute;
-  left: 50%;
-  top: 81px;
-  transform: translate(-50%, 0) rotate(-8deg);
-  font-family: var(--tm-brand);
-  font-size: 72px;
-  font-weight: 700;
-  font-style: italic;
-  color: rgba(120, 160, 200, 0.20);
-  white-space: nowrap;
-  pointer-events: none;
-  user-select: none;
-  z-index: 0;
-  letter-spacing: -0.03em;
-  text-transform: lowercase;
-  max-width: 860px;
+  display: none;
 }
 
 .tm-promo,
@@ -466,7 +454,7 @@
   top: 0;
   width: 482px;
   height: 100%;
-  background: var(--tm-blue-tint);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -488,7 +476,7 @@
   width: 100%;
   height: 49px;
   padding: 8px 12px;
-  background: var(--tm-blue-hdr);
+  background: transparent;
   font-size: 27px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -502,8 +490,8 @@
   width: 100%;
   height: 24px;
   padding: 5px 12px;
-  background: var(--tm-blue);
-  color: #fff;
+  background: transparent;
+  color: var(--tm-ink);
   font-family: var(--tm-label);
   font-size: 13px;
   font-weight: 700;
@@ -552,8 +540,8 @@
 
 .tm-r-tag {
   display: inline-block;
-  background: var(--tm-blue);
-  color: #fff;
+  background: transparent;
+  color: var(--tm-ink);
   font-family: var(--tm-label);
   font-size: 13px;
   font-weight: 700;
@@ -588,8 +576,8 @@
 
 .tm-r-seat-box {
   display: inline-block;
-  background: var(--tm-blue);
-  color: #fff;
+  background: transparent;
+  color: var(--tm-ink);
   padding: 2px 10px;
   font-size: 22px;
   width: fit-content;
@@ -700,18 +688,14 @@
   font-size: 27px;
   font-weight: 700;
   font-style: italic;
-  color: var(--tm-blue-dark);
+  color: var(--tm-ink);
   letter-spacing: 0.005em;
   line-height: 1;
   text-transform: lowercase;
 }
 
 .tm-swoosh {
-  width: 6px;
-  height: 393px;
-  background: var(--tm-yellow);
-  flex-shrink: 0;
-  align-self: center;
+  display: none;
 }
 
 .tm-legal {
@@ -744,7 +728,7 @@
   width: 1650px;
   height: 600px;
   overflow: hidden;
-  background: #fff;
+  background: var(--tm-stock);
   z-index: -1;
   pointer-events: none;
 }
@@ -771,7 +755,7 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #dbeafe;
+  color: var(--tm-blue-dark, #194279);
   text-align: center;
 }
 
@@ -781,7 +765,7 @@
   width: 100%;
   min-width: 0;
   padding: clamp(0.5rem, 2vw, 1rem) clamp(0.35rem, 1.5vw, 0.5rem);
-  background: #2a2630;
+  background: #d8e8f6;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -792,7 +776,7 @@
   aspect-ratio: 1650 / 600;
   position: relative;
   overflow: hidden;
-  background: #fff;
+  background: var(--tm-stock);
   border-radius: 6px;
   border: 1px solid var(--border, #a8c4df);
   margin: 0 auto;
@@ -818,7 +802,7 @@
 @media print {
   body {
     margin: 0;
-    background: #fff !important;
+    background: var(--tm-stock) !important;
   }
   body * { visibility: hidden; }
   .stub-preview-wrap,
@@ -828,7 +812,7 @@
     left: 0;
     top: 0;
     padding: 0;
-    background: #fff;
+    background: var(--tm-stock);
     border-radius: 0;
   }
   .stub-stack {

@@ -6,6 +6,8 @@ export const STUB_WIDTH_IN = 5.5;
 export const STUB_HEIGHT_IN = 2;
 export const STUB_WIDTH = Math.round(STUB_WIDTH_IN * STUB_DPI);
 export const STUB_HEIGHT = Math.round(STUB_HEIGHT_IN * STUB_DPI);
+/** Blank Boca-style blue thermal cardstock; stock color only — print is black ink on top. */
+export const STUB_STOCK_COLOR = "#4a8fd4";
 /** PNG export at 2× for print (must match client html-to-image settings). */
 export const STUB_EXPORT_WIDTH = STUB_WIDTH * 2;
 export const STUB_EXPORT_HEIGHT = STUB_HEIGHT * 2;

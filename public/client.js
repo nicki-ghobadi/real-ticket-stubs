@@ -12,6 +12,7 @@ import {
   STUB_WIDTH,
   STUB_HEIGHT,
   MIN_STUB_PNG_BYTES,
+  STUB_STOCK_COLOR,
 } from "./templates.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -154,10 +155,10 @@ function renderStub(fields) {
   }
   if (hint && variants.length > 1) {
     hint.textContent =
-      `${variants.length} tickets — one stub per seat (5.50″ × 2.00″ each). Print at 100% or save PNGs.`;
+      `${variants.length} tickets — blue cardstock, black text only (2.00″ × 5.50″ each).`;
   } else if (hint) {
     hint.textContent =
-      "Exact print size: 5.50″ wide × 2.00″ tall (300 dpi). Print at 100% scale — do not fit to page.";
+      "Blue blank cardstock with black thermal text only. Empty areas stay blue — only words and barcode print black.";
   }
 
   const printBtn = $("#print-btn");
@@ -244,7 +245,7 @@ async function exportStubPngDataUrl(fields, { seatLabel = "" } = {}) {
       width: STUB_WIDTH,
       height: STUB_HEIGHT,
       pixelRatio: 2,
-      backgroundColor: "#ffffff",
+      backgroundColor: STUB_STOCK_COLOR,
       cacheBust: true,
       skipFonts: false,
       skipAutoScale: true,
@@ -345,7 +346,7 @@ async function exportSvg() {
         const dataUrl = await window.htmlToImage.toSvg(ctx.node, {
           width: STUB_WIDTH,
           height: STUB_HEIGHT,
-          backgroundColor: "#ffffff",
+          backgroundColor: STUB_STOCK_COLOR,
           cacheBust: true,
         });
         const seatTag = variant.seat ? `-seat-${variant.seat}` : "";

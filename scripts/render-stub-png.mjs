@@ -25,9 +25,8 @@ export async function renderStubPngBuffers(fieldsList, { base = "http://localhos
     for (const fields of list) {
       const dataUrl = await page.evaluate(
         async (ticketFields) => {
-          const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT } = await import(
-            "/templates.js"
-          );
+          const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT, STUB_STOCK_COLOR } =
+            await import("/templates.js");
           const d = prepareTicketData(ticketFields);
           const host = document.createElement("div");
           host.className = "stub-export-host";
@@ -65,7 +64,7 @@ export async function renderStubPngBuffers(fieldsList, { base = "http://localhos
             width: STUB_WIDTH,
             height: STUB_HEIGHT,
             pixelRatio: 2,
-            backgroundColor: "#ffffff",
+            backgroundColor: STUB_STOCK_COLOR,
             cacheBust: true,
             skipFonts: false,
             skipAutoScale: true,

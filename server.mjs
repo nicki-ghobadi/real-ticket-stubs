@@ -140,7 +140,7 @@ function getPaymentLinksConfig() {
 const PRODUCTS = {
   mail: {
     name: "Printed ticket stub — mailed to you",
-    description: "Thermal-style cardstock, perforated, shipped in 3–5 days.",
+    description: "Black thermal print on blue perforated cardstock, shipped in 3–5 days.",
     amount: 999, // $9.99
   },
   framed: {

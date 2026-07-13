@@ -12,6 +12,7 @@ import {
   STUB_EXPORT_WIDTH,
   STUB_EXPORT_HEIGHT,
   MIN_STUB_PNG_BYTES,
+  STUB_STOCK_COLOR,
 } from "../public/templates.js";
 
 const base = (
@@ -98,7 +99,8 @@ try {
   await page.waitForTimeout(500);
 
   const layout = await page.evaluate(async (fields) => {
-    const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT } = await import("/templates.js");
+    const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT, STUB_STOCK_COLOR } =
+      await import("/templates.js");
     const d = prepareTicketData(fields);
     const host = document.createElement("div");
     host.className = "stub-export-host";
@@ -178,7 +180,8 @@ try {
     await new Promise((r) => setTimeout(r, 300));
     await document.fonts.ready;
 
-    const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT } = await import("/templates.js");
+    const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT, STUB_STOCK_COLOR } =
+      await import("/templates.js");
     const d = prepareTicketData(fields);
     const host = document.createElement("div");
     host.className = "stub-export-host";
@@ -191,7 +194,7 @@ try {
       width: STUB_WIDTH,
       height: STUB_HEIGHT,
       pixelRatio: 2,
-      backgroundColor: "#ffffff",
+      backgroundColor: STUB_STOCK_COLOR,
       cacheBust: true,
       skipAutoScale: true,
     });
