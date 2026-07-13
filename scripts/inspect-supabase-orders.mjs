@@ -23,6 +23,15 @@ function supabaseHeaders(extra = {}) {
   };
 }
 
+async function countOrders() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=id`, {
+    headers: supabaseHeaders({ Prefer: "count=exact" }),
+  });
+  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  const total = res.headers.get("content-range")?.split("/")?.[1];
+  return total ? Number(total) : null;
+}
+
 async function listRecentOrders(limit = 5) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc&limit=${limit}`,
@@ -79,9 +88,13 @@ async function main() {
   }
 
   const projectRef = SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "your-project";
+  const total = await countOrders().catch(() => null);
   console.log(`Project: ${projectRef}`);
-  console.log(`Dashboard → Table Editor → public.orders`);
-  console.log(`Dashboard → Storage → order-stubs → <order-id>/\n`);
+  if (total != null) console.log(`Total orders in database: ${total}`);
+  console.log(`Dashboard: https://supabase.com/dashboard/project/${projectRef}/editor`);
+  console.log(`  → Table Editor → schema public → table orders (sort created_at desc)`);
+  console.log(`  → Storage → bucket order-stubs → <order-id>/`);
+  console.log(`SQL Editor: select id, status, created_at, email from orders order by created_at desc limit 10;\n`);
 
   if (orderId) {
     const order = await getOrderById(orderId);

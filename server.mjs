@@ -809,10 +809,14 @@ const server = http.createServer(async (req, res) => {
 
   // ── Health check (for load balancers / uptime monitors) ──
   if (req.method === "GET" && pathname === "/healthz") {
+    const projectRef =
+      (process.env.SUPABASE_URL || "").match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || null;
     return sendJson(res, 200, {
       status: "ok",
       ai: !!ANTHROPIC_API_KEY,
       payments: !!stripe,
+      persistence: persistenceEnabled,
+      supabaseProject: projectRef,
       time: new Date().toISOString(),
     });
   }
