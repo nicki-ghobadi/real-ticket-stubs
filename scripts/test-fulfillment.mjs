@@ -150,6 +150,14 @@ if (persistenceEnabled) {
           orderCode: verified.order.stubFields.orderCode,
         });
         console.log("✅ Print PNG ready for fulfillment email:", `${Math.round(verified.pngBytes / 1024)} KB`);
+        console.log("✅ stub_tickets in Supabase:", verified.order.stubTickets.length, "entry/entries");
+        for (const t of verified.order.stubTickets) {
+          console.log(
+            `   · seat ${t.seat || "—"} → ${t.stub_png_path} (${Object.keys(t.stub_fields || {}).length} fields)`,
+          );
+        }
+        console.log("\n📋 Supabase — open Table Editor → orders, row id:", pending.orderId);
+        console.log("   Storage → order-stubs →", pending.orderId, "→ stub.png");
       }
       if (emailEnabled && paid.created) {
         console.log("✅ Customer confirmation email sent to", testEmail);
@@ -207,6 +215,49 @@ if (persistenceEnabled) {
         console.log("✅ Multi-seat pending order:", multiPending.orderId, "(2 tickets)");
         const seats = multiCheck.order.stubTickets.map((t) => t.seat).join(", ");
         console.log("✅ Per-seat PNGs stored for seats:", seats);
+        for (const t of multiCheck.order.stubTickets) {
+          console.log(
+            `   · seat ${t.seat} sec ${t.section} row ${t.row} → ${t.stub_png_path}`,
+          );
+        }
+
+        const multiPaid = await completePaidOrder({
+          orderId: multiPending.orderId,
+          sessionId: `${sessionId}_multi`,
+          email: testEmail,
+          productKey: "mail",
+          productName: "Printed ticket stub — mailed to you",
+          cartJson: JSON.stringify([{ product: "mail", quantity: 1 }]),
+          cartItems: [{ product: "mail", quantity: 1 }],
+          amountTotal: 999,
+          currency: "usd",
+          shipping: {
+            name: "Test Customer",
+            line1: "123 Main St",
+            city: "San Jose",
+            state: "CA",
+            postalCode: "95110",
+            country: "US",
+          },
+          addressStatus: "unknown",
+        });
+        if (multiPaid.error) {
+          console.error("❌ Multi-seat completePaidOrder failed:", multiPaid.error);
+          failed = true;
+        } else {
+          const multiPaidCheck = await verifyOrderRecord(multiPending.orderId, {
+            expectStatus: "paid",
+            expectTicketCount: 2,
+          });
+          if (!multiPaidCheck.ok) {
+            console.error("❌ Multi-seat paid record incomplete:", multiPaidCheck.error);
+            failed = true;
+          } else {
+            console.log("✅ Multi-seat paid order in Supabase:", multiPending.orderId);
+            console.log("   email:", multiPaidCheck.order.email);
+            console.log("   stub_fields + stub_tickets + 2 PNGs — check Table Editor & Storage");
+          }
+        }
       }
     }
   }
@@ -216,4 +267,7 @@ if (persistenceEnabled) {
 
 console.log();
 if (failed) process.exit(1);
-console.log("Done. Check Supabase → orders + Storage → order-stubs, and your inbox for full ticket PNGs.");
+console.log("Done. In Supabase dashboard:");
+console.log("  • Table Editor → public.orders → stub_fields, stub_tickets, ticket_artist, shipping columns");
+console.log("  • Storage → order-stubs → <order-id> → stub.png / stub-1.png …");
+console.log("  • Or run: npm run test:inspect-orders");

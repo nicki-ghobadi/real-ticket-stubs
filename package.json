@@ -8,6 +8,7 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "test:fulfillment": "node scripts/test-fulfillment.mjs",
+    "test:inspect-orders": "node scripts/inspect-supabase-orders.mjs",
     "test:smoke": "node scripts/smoke-test.mjs",
     "test:png": "node scripts/test-png-export.mjs"
   },
