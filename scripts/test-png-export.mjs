@@ -12,7 +12,6 @@ import {
   STUB_EXPORT_WIDTH,
   STUB_EXPORT_HEIGHT,
   MIN_STUB_PNG_BYTES,
-  STUB_STOCK_COLOR,
 } from "../public/templates.js";
 
 const base = (
@@ -170,37 +169,15 @@ try {
   }
   ok(`No overlapping text among ${layout.items.length} measured regions`);
 
-  const dataUrl = await page.evaluate(async (fields) => {
-    const form = document.getElementById("ticket-form");
-    for (const [name, value] of Object.entries(fields)) {
-      const el = form?.elements.namedItem(name);
-      if (el && "value" in el) el.value = value;
-    }
-    document.getElementById("render-btn")?.click();
-    await new Promise((r) => setTimeout(r, 300));
-    await document.fonts.ready;
+  await page.waitForFunction(
+    () => typeof window.__rtsExportStubPngDataUrl === "function",
+    { timeout: 20_000 },
+  );
 
-    const { prepareTicketData, buildTicketHtml, STUB_WIDTH, STUB_HEIGHT, STUB_STOCK_COLOR } =
-      await import("/templates.js");
-    const d = prepareTicketData(fields);
-    const host = document.createElement("div");
-    host.className = "stub-export-host";
-    host.innerHTML = buildTicketHtml(d);
-    const node = host.querySelector(".tm");
-    document.body.appendChild(host);
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-    const url = await window.htmlToImage.toPng(node, {
-      width: STUB_WIDTH,
-      height: STUB_HEIGHT,
-      pixelRatio: 2,
-      backgroundColor: STUB_STOCK_COLOR,
-      cacheBust: true,
-      skipAutoScale: true,
-    });
-    host.remove();
-    return url;
-  }, LONG_FIELDS);
+  const dataUrl = await page.evaluate(
+    (fields) => window.__rtsExportStubPngDataUrl(fields),
+    LONG_FIELDS,
+  );
 
   if (!dataUrl?.startsWith("data:image/png;base64,")) {
     fail("html-to-image did not return a PNG data URL");

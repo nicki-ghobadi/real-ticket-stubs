@@ -834,6 +834,15 @@ export async function sendOwnerNotification(order) {
   for (const ticket of tickets) {
     const seatTag = ticket.seat ? `seat-${ticket.seat}` : `ticket-${ticket.index || 1}`;
     if (!ticket.stub_png_path) continue;
+    const png = await downloadStubPng(ticket.stub_png_path);
+    if (png?.length) {
+      attachments.push({
+        filename: `stub-${code}-${seatTag}.png`,
+        content: png.toString("base64"),
+      });
+      console.log(`📎 Owner email: attaching ${seatTag} PNG (${Math.round(png.length / 1024)} KB)`);
+      continue;
+    }
     const stubUrl = await createSignedStubUrl(ticket.stub_png_path, 86_400);
     if (stubUrl) {
       attachments.push({
@@ -843,16 +852,7 @@ export async function sendOwnerNotification(order) {
       console.log(`📎 Owner email: attaching ${seatTag} via signed URL (${ticket.stub_png_path})`);
       continue;
     }
-    const png = await downloadStubPng(ticket.stub_png_path);
-    if (png?.length) {
-      attachments.push({
-        filename: `stub-${code}-${seatTag}.png`,
-        content: png.toString("base64"),
-      });
-      console.log(`📎 Owner email: attaching ${seatTag} PNG (${Math.round(png.length / 1024)} KB)`);
-    } else {
-      console.error("Owner email: could not download stub PNG from", ticket.stub_png_path);
-    }
+    console.error("Owner email: could not download stub PNG from", ticket.stub_png_path);
   }
   if (!attachments.length) {
     console.error("Owner email: order has no stub PNGs — nothing attached");

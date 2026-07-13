@@ -12,7 +12,6 @@ import {
   STUB_WIDTH,
   STUB_HEIGHT,
   MIN_STUB_PNG_BYTES,
-  STUB_STOCK_COLOR,
 } from "./templates.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -217,18 +216,20 @@ async function preloadStubFonts() {
   await document.fonts.ready;
 }
 
-/** Build a fresh full-size stub for PNG export (never clone the scaled preview). */
+/** Build a fresh full-size stub for PNG export (same DOM as on-page preview). */
 function createExportNode(fields) {
   const d = prepareTicketData(fields || readForm());
   const host = document.createElement("div");
   host.className = "stub-export-host";
-  host.setAttribute("aria-hidden", "true");
-  host.innerHTML = buildTicketHtml(d);
-  const node = host.querySelector(".tm");
+  const stage = document.createElement("div");
+  stage.className = "stub-stage stub-export-stage";
+  stage.innerHTML = buildTicketHtml(d);
+  const node = stage.querySelector(".tm");
   if (!node) return null;
   drawBarcode(node.querySelector(".tm-barcode"), d.barcodeScan);
+  host.appendChild(stage);
   document.body.appendChild(host);
-  return { host, node };
+  return { host, stage, node };
 }
 
 async function exportStubPngDataUrl(fields, { seatLabel = "" } = {}) {
@@ -241,11 +242,10 @@ async function exportStubPngDataUrl(fields, { seatLabel = "" } = {}) {
   try {
     await waitForPaint();
     await waitForPaint();
-    const dataUrl = await window.htmlToImage.toPng(ctx.node, {
+    const dataUrl = await window.htmlToImage.toPng(ctx.stage, {
       width: STUB_WIDTH,
       height: STUB_HEIGHT,
       pixelRatio: 2,
-      backgroundColor: STUB_STOCK_COLOR,
       cacheBust: true,
       skipFonts: false,
       skipAutoScale: true,
@@ -257,6 +257,9 @@ async function exportStubPngDataUrl(fields, { seatLabel = "" } = {}) {
     ctx.host.remove();
   }
 }
+
+/** Used by Playwright tests — must match checkout export exactly. */
+window.__rtsExportStubPngDataUrl = exportStubPngDataUrl;
 
 /** Client-side guard: reject blank/incomplete exports before checkout. */
 function assertRenderedPngDataUrl(dataUrl, seatLabel = "") {
@@ -343,10 +346,9 @@ async function exportSvg() {
       const ctx = createExportNode(variant);
       if (!ctx) continue;
       try {
-        const dataUrl = await window.htmlToImage.toSvg(ctx.node, {
+        const dataUrl = await window.htmlToImage.toSvg(ctx.stage, {
           width: STUB_WIDTH,
           height: STUB_HEIGHT,
-          backgroundColor: STUB_STOCK_COLOR,
           cacheBust: true,
         });
         const seatTag = variant.seat ? `-seat-${variant.seat}` : "";

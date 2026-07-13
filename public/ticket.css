@@ -728,9 +728,29 @@
   width: 1650px;
   height: 600px;
   overflow: hidden;
-  background: var(--tm-stock);
+  background: transparent;
   z-index: -1;
   pointer-events: none;
+}
+
+.stub-export-host .stub-export-stage {
+  width: 1650px;
+  height: 600px;
+  max-width: none;
+  aspect-ratio: auto;
+  margin: 0;
+  background: var(--tm-stock);
+  border: 0;
+  border-radius: 0;
+}
+
+.stub-export-host .stub-export-stage .tm {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: none !important;
+  width: 1650px;
+  height: 600px;
 }
 
 .stub-export-host .tm {
