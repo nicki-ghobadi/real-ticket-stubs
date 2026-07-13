@@ -153,10 +153,10 @@ function renderStub(fields) {
   }
   if (hint && variants.length > 1) {
     hint.textContent =
-      `${variants.length} tickets — one stub per seat (5.50″ × 1.75″ each). Print at 100% or save PNGs.`;
+      `${variants.length} tickets — one stub per seat (5.50″ × 2.00″ each). Print at 100% or save PNGs.`;
   } else if (hint) {
     hint.textContent =
-      "Exact print size: 5.50″ wide × 1.75″ tall (300 dpi). Print at 100% scale — do not fit to page.";
+      "Exact print size: 5.50″ wide × 2.00″ tall (300 dpi). Print at 100% scale — do not fit to page.";
   }
 
   const printBtn = $("#print-btn");
@@ -171,7 +171,7 @@ function renderStub(fields) {
   requestAnimationFrame(() => fitStubPreviewScales());
 }
 
-/** Scale each preview stage so the full 1650×525 stub fits its container width. */
+/** Scale each preview stage so the full 1650×600 stub fits its container width. */
 function fitStubPreviewScales() {
   document.querySelectorAll(".stub-stage").forEach((stage) => {
     const tm = stage.querySelector(".tm");
@@ -1145,11 +1145,11 @@ function showStep(name) {
 
 /** Create a Stripe Checkout Session for the cart and return either
  *  { url } (redirect to Stripe) or { mock, confirmation } (demo fallback). */
-async function createCheckoutSession(stubFields, stubPng) {
+async function createCheckoutSession(stubFields, stubTickets) {
   const payload = {
     cart: cart.map((item) => ({ product: item.product, quantity: item.quantity })),
     stubFields,
-    stubPng,
+    stubTickets,
   };
 
   const res = await fetch(api("/api/create-checkout-session"), {
@@ -1184,15 +1184,26 @@ async function startCheckout() {
   try {
     const stubFields = { ...readForm() };
     const variants = getTicketVariants(stubFields);
-    let stubPng;
+    const stubTickets = [];
     try {
-      if (btn) btn.textContent = "Rendering stub…";
-      stubPng = await exportStubPngDataUrl(variants[0]);
+      for (let i = 0; i < variants.length; i++) {
+        if (btn) {
+          btn.textContent =
+            variants.length > 1
+              ? `Rendering stub ${i + 1} of ${variants.length}…`
+              : "Rendering stub…";
+        }
+        const stubPng = await exportStubPngDataUrl(variants[i]);
+        stubTickets.push({ stubFields: variants[i], stubPng });
+        if (variants.length > 1 && i < variants.length - 1) {
+          await new Promise((r) => setTimeout(r, 80));
+        }
+      }
     } catch (e) {
       throw new Error(e?.message || "Could not prepare stub image for printing.");
     }
     if (btn) btn.textContent = "Redirecting to Stripe…";
-    const result = await createCheckoutSession(stubFields, stubPng);
+    const result = await createCheckoutSession(stubFields, stubTickets);
     if (result.url) {
       goToStripe(result.url);
       return;

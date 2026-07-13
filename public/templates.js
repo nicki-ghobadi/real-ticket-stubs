@@ -1,9 +1,9 @@
 /** Stub HTML/CSS generation. @see TODO.md — server-side PDF export for fulfillment. */
 
-/** Print canvas @ 300 dpi — 5.50″ wide × 1.75″ tall thermal stub. */
+/** Print canvas @ 300 dpi — 5.50″ wide × 2.00″ tall thermal stub. */
 export const STUB_DPI = 300;
 export const STUB_WIDTH_IN = 5.5;
-export const STUB_HEIGHT_IN = 1.75;
+export const STUB_HEIGHT_IN = 2;
 export const STUB_WIDTH = Math.round(STUB_WIDTH_IN * STUB_DPI);
 export const STUB_HEIGHT = Math.round(STUB_HEIGHT_IN * STUB_DPI);
 
@@ -420,7 +420,7 @@ function renderBarcodeSvg(value) {
 
   // Vertical barcode: stripes run horizontally (full width), stacked top-to-bottom.
   const viewW = 54;
-  const viewH = 490;
+  const viewH = 560;
   let y = 4;
   const rects = [];
   for (let i = 0; i < heights.length && y < viewH - 4; i++) {

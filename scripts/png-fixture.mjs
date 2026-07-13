@@ -1,4 +1,4 @@
-/** Minimal valid PNG at stub print size (1300×589) for smoke tests. */
+/** Minimal valid PNG at stub print size (3300×1200 @2x of 1650×600) for smoke tests. */
 import zlib from "node:zlib";
 
 function pngChunk(type, data) {
@@ -20,7 +20,7 @@ function crc32(buf) {
   return ~c >>> 0;
 }
 
-export function minStubPngBuffer(width = 1300, height = 589) {
+export function minStubPngBuffer(width = 3300, height = 1200) {
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);

@@ -1,4 +1,4 @@
-/* Vector Ticketmaster stub — designed at 1650×525 (5.50in × 1.75in @ 300dpi).
+/* Vector Ticketmaster stub — designed at 1650×600 (5.50in × 2.00in @ 300dpi).
    Pure HTML/CSS/SVG, no raster image; safe for high-quality print. */
 
 /* Force any monospace value to render in bold-thermal weight; OCR-A Std only
@@ -10,7 +10,7 @@
 
 .tm {
   --tm-w: 1650px;
-  --tm-h: 525px;
+  --tm-h: 600px;
 
   --tm-blue: #2360a8;
   --tm-blue-dark: #194279;
@@ -84,19 +84,19 @@
   left: 0;
   top: 0;
   width: 100%;
-  height: 43px;
-  padding: 9px 18px;
+  height: 49px;
+  padding: 10px 18px;
   background: var(--tm-blue-hdr);
-  font-size: 27px;
+  font-size: 31px;
   font-weight: 700;
 }
 
 .tm-left-toplbl {
   position: absolute;
   left: 0;
-  top: 43px;
+  top: 49px;
   width: 100%;
-  height: 20px;
+  height: 23px;
   padding: 4px 18px;
   background: var(--tm-blue);
   color: #fff;
@@ -109,8 +109,8 @@
 .tm-left-price {
   position: absolute;
   left: 18px;
-  top: 75px;
-  font-size: 34px;
+  top: 86px;
+  font-size: 39px;
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -118,9 +118,9 @@
 .tm-left-cc {
   position: absolute;
   left: 18px;
-  top: 116px;
+  top: 133px;
   font-family: var(--tm-label);
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 700;
   color: #444;
   letter-spacing: 0.04em;
@@ -129,15 +129,15 @@
 .tm-left-cc-sym {
   position: absolute;
   left: 18px;
-  top: 130px;
-  font-size: 16px;
+  top: 149px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .tm-left-seclbl {
   position: absolute;
   left: 0;
-  top: 160px;
+  top: 183px;
   width: 100%;
   height: 18px;
   padding: 4px 18px;
@@ -152,9 +152,9 @@
 .tm-left-sec {
   position: absolute;
   left: 18px;
-  top: 189px;
+  top: 216px;
   max-width: 228px;
-  font-size: 37px;
+  font-size: 42px;
   font-weight: 700;
   line-height: 1;
   overflow: hidden;
@@ -165,8 +165,8 @@
 .tm-left-aux {
   position: absolute;
   left: 18px;
-  top: 239px;
-  font-size: 23px;
+  top: 273px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -174,7 +174,7 @@
 .tm-left-rowlbl {
   position: absolute;
   left: 0;
-  top: 278px;
+  top: 318px;
   width: 60%;
   height: 18px;
   padding: 4px 18px;
@@ -189,7 +189,7 @@
 .tm-left-seatlbl {
   position: absolute;
   right: 0;
-  top: 278px;
+  top: 318px;
   width: 40%;
   height: 18px;
   padding: 4px 18px;
@@ -204,7 +204,7 @@
 .tm-left-row {
   position: absolute;
   left: 22px;
-  top: 307px;
+  top: 351px;
   font-size: 36px;
   font-weight: 700;
 }
@@ -212,7 +212,7 @@
 .tm-left-seat {
   position: absolute;
   right: 40px;
-  top: 307px;
+  top: 351px;
   font-size: 36px;
   font-weight: 700;
 }
@@ -220,8 +220,8 @@
 .tm-left-order {
   position: absolute;
   left: 18px;
-  bottom: 50px;
-  font-size: 25px;
+  bottom: 57px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -230,7 +230,7 @@
   position: absolute;
   left: 18px;
   bottom: 12px;
-  font-size: 29px;
+  font-size: 33px;
   font-weight: 700;
 }
 
@@ -247,14 +247,14 @@
 .tm-head-vals {
   position: absolute;
   left: 0;
-  top: 9px;
+  top: 10px;
   width: 100%;
   height: 32px;
   padding: 0 28px;
   display: grid;
   grid-template-columns: 213px 140px 114px 213px 1fr;
   align-items: center;
-  font-size: 25px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: 0.02em;
   overflow: hidden;
@@ -272,16 +272,16 @@
 .tm-head-lbls {
   position: absolute;
   left: 0;
-  top: 46px;
+  top: 53px;
   width: 100%;
-  height: 23px;
+  height: 26px;
   padding: 5px 28px;
   background: var(--tm-blue-hdr);
   display: grid;
   grid-template-columns: 213px 140px 114px 213px 1fr;
   align-items: center;
   font-family: var(--tm-label);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -296,11 +296,11 @@
 .tm-sub {
   position: absolute;
   left: 0;
-  top: 78px;
+  top: 89px;
   width: 100%;
   padding: 4px 28px;
-  height: 34px;
-  font-size: 23px;
+  height: 39px;
+  font-size: 26px;
   font-weight: 700;
 }
 
@@ -337,20 +337,20 @@
 .tm-event {
   position: absolute;
   left: 0;
-  top: 116px;
+  top: 133px;
   width: 100%;
-  height: calc(var(--tm-h) - 116px);
+  height: calc(var(--tm-h) - 133px);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 7px 30px 14px;
+  padding: 8px 34px 16px;
 }
 
 .tm-wm {
   position: absolute;
   left: 50%;
-  top: 71px;
+  top: 81px;
   transform: translate(-50%, 0) rotate(-8deg);
   font-family: var(--tm-brand);
   font-size: 72px;
@@ -378,15 +378,15 @@
 
 .tm-promo {
   margin-top: 5px;
-  font-size: 25px;
+  font-size: 29px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 
 .tm-artist {
-  margin-top: 9px;
+  margin-top: 10px;
   font-family: var(--tm-artist);
-  font-size: 62px;
+  font-size: 71px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -401,13 +401,13 @@
 }
 
 .tm-artist.tm-artist-long {
-  font-size: 37px;
+  font-size: 42px;
   letter-spacing: 0.01em;
 }
 
 .tm-tour {
   margin-top: 12px;
-  font-size: 29px;
+  font-size: 33px;
   font-weight: 700;
   letter-spacing: 0.04em;
   max-width: 844px;
@@ -417,8 +417,8 @@
 }
 
 .tm-venue {
-  margin-top: 11px;
-  font-size: 29px;
+  margin-top: 13px;
+  font-size: 33px;
   font-weight: 700;
   letter-spacing: 0.03em;
   max-width: 844px;
@@ -430,12 +430,12 @@
 }
 
 .tm-venue.tm-venue-long {
-  font-size: 23px;
+  font-size: 26px;
 }
 
 .tm-disclaim {
   margin-top: 12px;
-  font-size: 23px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: 0.03em;
   max-width: 844px;
@@ -445,8 +445,8 @@
 }
 
 .tm-datetime {
-  margin-top: 14px;
-  font-size: 30px;
+  margin-top: 16px;
+  font-size: 34px;
   font-weight: 700;
   letter-spacing: 0.03em;
   max-width: 844px;
@@ -475,7 +475,7 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 208px;
+  width: 238px;
   height: 100%;
   overflow: hidden;
   z-index: 2;
@@ -486,10 +486,10 @@
   left: 0;
   top: 0;
   width: 100%;
-  height: 43px;
-  padding: 7px 12px;
+  height: 49px;
+  padding: 8px 12px;
   background: var(--tm-blue-hdr);
-  font-size: 24px;
+  font-size: 27px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -498,14 +498,14 @@
 .tm-r-toplbl {
   position: absolute;
   left: 0;
-  top: 43px;
+  top: 49px;
   width: 100%;
-  height: 21px;
+  height: 24px;
   padding: 5px 12px;
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -513,9 +513,9 @@
 .tm-r-evnum {
   position: absolute;
   left: 12px;
-  top: 77px;
+  top: 88px;
   max-width: 184px;
-  font-size: 24px;
+  font-size: 27px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -524,9 +524,9 @@
 .tm-r-cn {
   position: absolute;
   left: 12px;
-  top: 118px;
+  top: 135px;
   max-width: 184px;
-  font-size: 24px;
+  font-size: 27px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -535,13 +535,13 @@
 .tm-r-grid {
   position: absolute;
   left: 10px;
-  top: 162px;
+  top: 185px;
   width: 188px;
   display: grid;
   grid-template-columns: 48px 72px 1fr;
   grid-auto-rows: auto;
   align-items: center;
-  row-gap: 7px;
+  row-gap: 8px;
   column-gap: 5px;
   overflow: hidden;
 }
@@ -555,7 +555,7 @@
   background: var(--tm-blue);
   color: #fff;
   font-family: var(--tm-label);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   padding: 3px 5px;
   text-align: center;
@@ -566,7 +566,7 @@
 }
 
 .tm-r-val {
-  font-size: 24px;
+  font-size: 27px;
   align-self: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -575,7 +575,7 @@
 }
 
 .tm-r-side {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.01em;
   align-self: end;
@@ -598,7 +598,7 @@
 /* Barcode + brand — full-height barcode; wordmark vertically centered beside it. */
 .tm-r-tail {
   position: absolute;
-  left: 212px;
+  left: 242px;
   right: 32px;
   top: 0;
   bottom: 0;
@@ -650,7 +650,7 @@
 
 @supports not (width: 1cqh) {
   .tm-barcode.tm-barcode--live {
-    width: 490px;
+    width: 560px;
     height: 48px;
   }
 }
@@ -677,12 +677,12 @@
   justify-content: center;
   gap: 6px;
   flex-shrink: 0;
-  height: 380px;
+  height: 434px;
 }
 
 .tm-logo-wrap {
   width: 36px;
-  height: 380px;
+  height: 434px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -697,7 +697,7 @@
   transform: rotate(-90deg);
   transform-origin: center center;
   font-family: var(--tm-brand);
-  font-size: 24px;
+  font-size: 27px;
   font-weight: 700;
   font-style: italic;
   color: var(--tm-blue-dark);
@@ -708,7 +708,7 @@
 
 .tm-swoosh {
   width: 6px;
-  height: 344px;
+  height: 393px;
   background: var(--tm-yellow);
   flex-shrink: 0;
   align-self: center;
@@ -723,7 +723,7 @@
   writing-mode: vertical-lr;
   text-orientation: mixed;
   font-family: var(--tm-label);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.02em;
@@ -739,10 +739,10 @@
 /* Off-screen full-size render target for PNG export (no preview scaling). */
 .stub-export-host {
   position: fixed;
-  left: -99999px;
+  left: -114285px;
   top: 0;
   width: 1650px;
-  height: 525px;
+  height: 600px;
   overflow: hidden;
   background: #fff;
   z-index: -1;
@@ -753,7 +753,7 @@
   position: relative;
   transform: none !important;
   width: 1650px;
-  height: 525px;
+  height: 600px;
 }
 
 /* Preview scaling — fluid width via container queries (phones → laptops). */
@@ -789,7 +789,7 @@
 .stub-stage {
   width: 100%;
   max-width: 1650px;
-  aspect-ratio: 1650 / 525;
+  aspect-ratio: 1650 / 600;
   position: relative;
   overflow: hidden;
   background: #fff;
@@ -804,7 +804,7 @@
   top: 0;
   left: 0;
   width: 1650px;
-  height: 525px;
+  height: 600px;
   transform-origin: top left;
   /* transform scale set in JS (fitStubPreviewScales) to match container width */
 }
@@ -842,7 +842,7 @@
   }
   .stub-stage {
     width: 1650px;
-    height: 525px;
+    height: 600px;
     border: 0;
     overflow: visible;
     page-break-after: always;
@@ -855,10 +855,10 @@
   .stub-stage .tm {
     transform: none !important;
     width: 1650px;
-    height: 525px;
+    height: 600px;
   }
   @page {
-    size: 5.5in 1.75in;
+    size: 5.5in 2in;
     margin: 0;
   }
 }

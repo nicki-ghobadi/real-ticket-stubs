@@ -194,6 +194,25 @@ function parseCartPayload(payload) {
   return { items, lineItems, cartJson, productSummary, productName, productKey: items.length === 1 ? items[0].product : "cart" };
 }
 
+function cartAmountTotal(items) {
+  return items.reduce(
+    (sum, { product, quantity }) => sum + (PRODUCTS[product]?.amount || 0) * quantity,
+    0,
+  );
+}
+
+/** Ensure checkout always stores stub PNG + fields when Supabase is configured. */
+function requirePendingOrderSaved(pending) {
+  if (pending.error) {
+    return { error: "Could not save your stub for printing. Try again." };
+  }
+  if (persistenceEnabled && !pending.persisted) {
+    console.error("Pending order not persisted:", pending);
+    return { error: "Order storage is unavailable. Try again shortly." };
+  }
+  return { orderId: pending.orderId };
+}
+
 /** Decode PNG IHDR width/height. */
 function pngDimensions(buffer) {
   if (!buffer || buffer.length < 24) return null;
@@ -221,6 +240,32 @@ function parseStubPng(dataUrl) {
     };
   }
   return { buffer, dimensions: dim };
+}
+
+/** Parse one or more print-ready stub PNGs + per-seat fields from checkout payload. */
+function parseCheckoutStubs(payload) {
+  const sharedFields = sanitizeStubFields(payload?.stubFields || payload?.item || {});
+
+  if (Array.isArray(payload?.stubTickets) && payload.stubTickets.length) {
+    const tickets = [];
+    for (let i = 0; i < payload.stubTickets.length; i++) {
+      const entry = payload.stubTickets[i] || {};
+      const fields = sanitizeStubFields(entry.stubFields || entry.fields || sharedFields);
+      const pngParsed = parseStubPng(entry.stubPng || entry.png);
+      if (pngParsed.error) {
+        return { error: `Ticket ${i + 1}: ${pngParsed.error}` };
+      }
+      tickets.push({ stubFields: fields, stubPngBuffer: pngParsed.buffer });
+    }
+    return { stubFields: sharedFields, stubTickets: tickets };
+  }
+
+  const pngParsed = parseStubPng(payload?.stubPng);
+  if (pngParsed.error) return { error: pngParsed.error };
+  return {
+    stubFields: sharedFields,
+    stubTickets: [{ stubFields: sharedFields, stubPngBuffer: pngParsed.buffer }],
+  };
 }
 
 /** Parse cart from Stripe session metadata (webhook / success page). */
@@ -832,34 +877,59 @@ const server = http.createServer(async (req, res) => {
       const parsed = parseCartPayload(payload);
       if (parsed.error) return sendJson(res, 400, { error: parsed.error });
 
-      const stubFields = sanitizeStubFields(payload?.stubFields || payload?.item || {});
-      const pngParsed = parseStubPng(payload?.stubPng);
-      if (pngParsed.error) return sendJson(res, 400, { error: pngParsed.error });
-
-      // Demo fallback for local dev only.
-      if (!stripe) {
-        if (IS_PROD) {
-          return sendJson(res, 503, { error: "Payments are not configured." });
-        }
-        const confirmation = "RTS-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-        console.log("⚠️  STRIPE_SECRET_KEY not set — mocking order:", {
-          confirmation,
-          cart: parsed.productSummary,
-          stub: stubFields.eventLine2 || stubFields.section || "(empty)",
-        });
-        return sendJson(res, 200, { mock: true, confirmation });
-      }
+      const stubParsed = parseCheckoutStubs(payload);
+      if (stubParsed.error) return sendJson(res, 400, { error: stubParsed.error });
 
       const pending = await createPendingOrder({
         cartItems: parsed.items,
         cartJson: parsed.cartJson,
         productKey: parsed.productKey,
         productName: parsed.productName,
-        stubFields,
-        stubPngBuffer: pngParsed.buffer,
+        stubFields: stubParsed.stubFields,
+        stubTickets: stubParsed.stubTickets,
       });
-      if (pending.error) {
-        return sendJson(res, 503, { error: "Could not save your stub for printing. Try again." });
+      const saved = requirePendingOrderSaved(pending);
+      if (saved.error) return sendJson(res, 503, { error: saved.error });
+
+      // Demo fallback for local dev only (still persists stub + fields to Supabase).
+      if (!stripe) {
+        if (IS_PROD) {
+          return sendJson(res, 503, { error: "Payments are not configured." });
+        }
+        const confirmation = "RTS-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+        const mockSessionId = `cs_test_mock_${Date.now().toString(36)}`;
+        await linkStripeSession(pending.orderId, mockSessionId);
+        const fulfilled = await completePaidOrder({
+          orderId: pending.orderId,
+          sessionId: mockSessionId,
+          email: process.env.TEST_ORDER_EMAIL || "",
+          productKey: parsed.productKey,
+          productName: parsed.productName,
+          cartJson: parsed.cartJson,
+          cartItems: parsed.items,
+          amountTotal: cartAmountTotal(parsed.items),
+          currency: "usd",
+          shipping: {
+            name: "Mock Customer",
+            line1: "123 Test St",
+            city: "San Jose",
+            state: "CA",
+            postalCode: "95110",
+            country: "US",
+          },
+          addressStatus: "mock",
+        });
+        if (fulfilled.error) {
+          console.error("Mock checkout fulfillment error:", fulfilled.error);
+        }
+        console.log("⚠️  STRIPE_SECRET_KEY not set — mock order saved:", {
+          confirmation,
+          orderId: pending.orderId,
+          cart: parsed.productSummary,
+          stub: stubParsed.stubFields.eventLine2 || stubParsed.stubFields.section || "(empty)",
+          tickets: stubParsed.stubTickets.length,
+        });
+        return sendJson(res, 200, { mock: true, confirmation, orderId: pending.orderId });
       }
 
       const origin = getOrigin(req);

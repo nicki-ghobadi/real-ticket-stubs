@@ -11,11 +11,12 @@ import { minStubPngBuffer } from "./png-fixture.mjs";
 import {
   createPendingOrder,
   completePaidOrder,
-  getOrderById,
+  verifyOrderRecord,
   persistenceEnabled,
   emailEnabled,
   ownerEmailEnabled,
 } from "../fulfillment.mjs";
+import { expandTicketsForSeating } from "../public/templates.js";
 
 const args = process.argv.slice(2);
 const emailFlag = args.find((a) => a.startsWith("--email="));
@@ -28,12 +29,16 @@ const stubPngBuffer = minStubPngBuffer();
 
 const stubFields = {
   eventLine2: "COLDPLAY",
+  tour: "VIVA LA VIDA TOUR",
   venue: "HP PAVILION AT SAN JOSE",
   datetime: "FRI JUL 18 2008 7:30 PM",
-  section: "117",
+  section: "FLR 3",
   row: "14",
   seat: "1",
-  barcode: "6540422223612",
+  orderCode: "404VSJA",
+  barcode: "404VSJA",
+  price: "180.00",
+  promo: "WWW.LIVENATION.COM",
 };
 
 console.log("Real Ticket Stubs — fulfillment smoke test\n");
@@ -66,6 +71,15 @@ if (persistenceEnabled) {
   } else {
     console.log("✅ Pending order created with stub PNG:", pending.orderId);
 
+    const pendingCheck = await verifyOrderRecord(pending.orderId, { expectStatus: "pending" });
+    if (!pendingCheck.ok) {
+      console.error("❌ Pending order record incomplete:", pendingCheck.error);
+      failed = true;
+    } else {
+      console.log("✅ Pending stub_fields saved:", Object.keys(pendingCheck.order.stubFields).join(", "));
+      console.log("✅ Pending stub PNG in storage:", `${Math.round(pendingCheck.pngBytes / 1024)} KB`);
+    }
+
     const paid = await completePaidOrder({
       orderId: pending.orderId,
       sessionId,
@@ -91,19 +105,66 @@ if (persistenceEnabled) {
       console.error("❌ completePaidOrder failed:", paid.error);
       failed = true;
     } else {
-      const row = await getOrderById(pending.orderId);
-      if (row?.stubPngPath) {
-        console.log("✅ Supabase stub_png_path:", row.stubPngPath);
-      } else {
-        console.error("❌ Supabase stub_png_path is empty on paid order");
+      const verified = await verifyOrderRecord(pending.orderId, { expectStatus: "paid" });
+      if (!verified.ok) {
+        console.error("❌ Paid order record incomplete:", verified.error);
         failed = true;
+      } else {
+        console.log("✅ Paid order status:", verified.order.status);
+        console.log("✅ Supabase stub_png_path:", verified.order.stubPngPath);
+        console.log("✅ Extracted fields persisted:", {
+          artist: verified.order.stubFields.eventLine2,
+          venue: verified.order.stubFields.venue,
+          section: verified.order.stubFields.section,
+          row: verified.order.stubFields.row,
+          seat: verified.order.stubFields.seat,
+          orderCode: verified.order.stubFields.orderCode,
+        });
+        console.log("✅ Print PNG ready for fulfillment email:", `${Math.round(verified.pngBytes / 1024)} KB`);
       }
       if (emailEnabled && paid.created) {
         console.log("✅ Customer confirmation email sent to", testEmail);
       }
       if (ownerEmailEnabled && paid.created) {
-        console.log("✅ Owner alert sent with PNG attachment to", process.env.FULFILLMENT_EMAIL || process.env.ORDER_FROM_EMAIL);
+        console.log(
+          "✅ Owner alert sent with PNG attachment to",
+          process.env.FULFILLMENT_EMAIL || process.env.ORDER_FROM_EMAIL,
+        );
       }
+    }
+  }
+
+  // Multi-seat order: one PNG + field set per ticket.
+  const multiVariants = expandTicketsForSeating(stubFields, [
+    { section: "FLR2", row: "4", seat: "15" },
+    { section: "FLR2", row: "4", seat: "16" },
+  ]);
+  const multiPending = await createPendingOrder({
+    cartItems: [{ product: "mail", quantity: 1 }],
+    cartJson: JSON.stringify([{ product: "mail", quantity: 1 }]),
+    productKey: "mail",
+    productName: "Printed ticket stub — mailed to you",
+    stubFields,
+    stubTickets: multiVariants.map((variant) => ({
+      stubFields: variant,
+      stubPngBuffer: minStubPngBuffer(),
+    })),
+  });
+  if (multiPending.error) {
+    console.error("❌ Multi-seat pending order failed:", multiPending.error);
+    failed = true;
+  } else {
+    const multiCheck = await verifyOrderRecord(multiPending.orderId, {
+      expectStatus: "pending",
+      expectTicketCount: 2,
+    });
+    if (!multiCheck.ok) {
+      console.error("❌ Multi-seat pending record incomplete:", multiCheck.error);
+      failed = true;
+    } else {
+      console.log("✅ Multi-seat pending order:", multiPending.orderId, "(2 tickets)");
+      const seats = multiCheck.order.stubTickets.map((t) => t.seat).join(", ");
+      console.log("✅ Per-seat PNGs stored for seats:", seats);
     }
   }
 } else if (emailEnabled || ownerEmailEnabled) {
@@ -112,4 +173,4 @@ if (persistenceEnabled) {
 
 console.log();
 if (failed) process.exit(1);
-console.log("Done. Check Supabase → orders (stub_png_path) + Storage → order-stubs, and your inbox.");
+console.log("Done. Check Supabase → orders (stub_fields, stub_tickets, stub_png_path) + Storage → order-stubs, and your inbox.");

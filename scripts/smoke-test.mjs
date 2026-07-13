@@ -7,6 +7,7 @@
  */
 import "../load-env.mjs";
 import { minStubPngDataUrl } from "./png-fixture.mjs";
+import { verifyOrderRecord, persistenceEnabled } from "../fulfillment.mjs";
 import { normalizeExtractedFields, prepareTicketData, parseSeatList, expandTicketsForSeating, resolveSeatingSlots } from "../public/templates.js";
 import { validateShippingFormat } from "../public/shipping-validation.js";
 
@@ -140,11 +141,34 @@ try {
       eventLine2: "SMOKE TEST",
       venue: "Arena",
       datetime: "FRI JUN 8 2026 8:00 PM",
-      section: "117",
-      row: "14",
-      seat: "1",
+      section: "FLR2",
+      row: "4",
+      seat: "15",
     },
-    stubPng: minStubPngDataUrl(),
+    stubTickets: [
+      {
+        stubFields: {
+          eventLine2: "SMOKE TEST",
+          venue: "Arena",
+          datetime: "FRI JUN 8 2026 8:00 PM",
+          section: "FLR2",
+          row: "4",
+          seat: "15",
+        },
+        stubPng: minStubPngDataUrl(),
+      },
+      {
+        stubFields: {
+          eventLine2: "SMOKE TEST",
+          venue: "Arena",
+          datetime: "FRI JUN 8 2026 8:00 PM",
+          section: "FLR2",
+          row: "4",
+          seat: "16",
+        },
+        stubPng: minStubPngDataUrl(),
+      },
+    ],
   });
   if (checkout.res.status === 200 && checkout.json?.url?.includes("checkout.stripe.com")) {
     ok("POST /api/create-checkout-session");
@@ -155,6 +179,21 @@ try {
     ok("POST /api/create-checkout-session (mock mode)");
   } else {
     fail("POST /api/create-checkout-session", JSON.stringify(checkout.json));
+  }
+
+  if (checkout.res.status === 200 && checkout.json?.orderId && persistenceEnabled) {
+    const expectStatus = checkout.json.mock ? "paid" : "pending";
+    const verified = await verifyOrderRecord(checkout.json.orderId, {
+      expectStatus,
+      expectTicketCount: 2,
+    });
+    if (verified.ok) {
+      ok(`Order saved to Supabase (${expectStatus}, 2 stub PNGs + fields)`);
+    } else {
+      fail("Order Supabase record", verified.error);
+    }
+  } else if (checkout.res.status === 200 && persistenceEnabled && !checkout.json?.orderId) {
+    fail("Order Supabase record", "checkout succeeded but orderId missing");
   }
 
   const csp = home.res.headers.get("content-security-policy");
